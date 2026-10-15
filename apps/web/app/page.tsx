@@ -1,7 +1,3 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>PropHover</h1>
-    </main>
-  );
-}
+import HomePage from "./_features/home/HomePage";
+
+export default HomePage;
