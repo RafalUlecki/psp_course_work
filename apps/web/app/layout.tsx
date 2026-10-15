@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { Providers } from "./providers";
+import type { ReactElement } from "react";
+import { Providers } from "./_app/Providers";
 
 export const metadata: Metadata = {
   title: "PropHover",
   description: "NBA props hit-rate helper",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+const RootLayout = (props: LayoutProps<"/">): ReactElement => {
+  const { children } = props;
+
   return (
     <html lang="en">
       <body>
@@ -14,4 +17,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </body>
     </html>
   );
-}
+};
+
+export default RootLayout;
