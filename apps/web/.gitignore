@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large season dumps — only the small fixture under data/fixtures/ is committed
+/data/*.full.csv

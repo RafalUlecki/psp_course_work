@@ -50,6 +50,8 @@ npm run db:migrate
 
 Other scripts: `npm run db:generate` (Prisma Client) and `npm run db:studio` (browse tables). `prisma generate` also runs on `npm install` via `postinstall`.
 
+Sample game logs for seeding live in [`data/fixtures/game_logs_sample.csv`](data/fixtures/game_logs_sample.csv). See [`data/README.md`](data/README.md) for columns, ESPN source, and how a larger CSV will be passed into the PH-8 seed (`SEED_CSV_PATH`).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

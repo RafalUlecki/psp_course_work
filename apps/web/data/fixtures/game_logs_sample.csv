@@ -1,0 +1,25 @@
+player_name,team,game_date,opponent,venue,pts,reb,ast,source,source_game_id
+Nikola Jokic,DEN,2026-03-18,MEM,away,29,14,9,espn,401858693
+Nikola Jokic,DEN,2026-03-20,TOR,home,22,8,9,espn,401810876
+Nikola Jokic,DEN,2026-03-22,POR,home,22,14,14,espn,401810887
+Nikola Jokic,DEN,2026-03-24,PHX,away,23,17,17,espn,401810905
+Nikola Jokic,DEN,2026-03-25,DAL,home,23,21,19,espn,401810914
+Nikola Jokic,DEN,2026-03-27,UTAH,home,33,15,12,espn,401810927
+Nikola Jokic,DEN,2026-03-29,GS,home,25,15,8,espn,401810945
+Nikola Jokic,DEN,2026-04-01,UTAH,away,15,17,12,espn,401810967
+Nikola Jokic,DEN,2026-04-04,SA,home,40,8,13,espn,401810985
+Nikola Jokic,DEN,2026-04-06,POR,home,35,14,13,espn,401811002
+Nikola Jokic,DEN,2026-04-08,MEM,home,14,16,10,espn,401811017
+Nikola Jokic,DEN,2026-04-12,SA,away,23,8,1,espn,401811052
+Shai Gilgeous-Alexander,OKC,2026-03-17,ORL,away,40,5,2,espn,401810847
+Shai Gilgeous-Alexander,OKC,2026-03-18,BKN,away,20,3,6,espn,401810855
+Shai Gilgeous-Alexander,OKC,2026-03-21,WSH,away,40,3,7,espn,401810877
+Shai Gilgeous-Alexander,OKC,2026-03-23,PHI,away,22,5,5,espn,401810895
+Shai Gilgeous-Alexander,OKC,2026-03-25,BOS,away,33,2,8,espn,401810909
+Shai Gilgeous-Alexander,OKC,2026-03-27,CHI,home,25,2,5,espn,401810925
+Shai Gilgeous-Alexander,OKC,2026-03-29,NY,home,30,3,4,espn,401810944
+Shai Gilgeous-Alexander,OKC,2026-03-30,DET,home,47,5,3,espn,401810952
+Shai Gilgeous-Alexander,OKC,2026-04-02,LAL,home,28,7,7,espn,401810971
+Shai Gilgeous-Alexander,OKC,2026-04-05,UTAH,home,20,4,7,espn,401810994
+Shai Gilgeous-Alexander,OKC,2026-04-07,LAL,away,25,1,8,espn,401811010
+Shai Gilgeous-Alexander,OKC,2026-04-08,LAC,away,20,1,11,espn,401811018
