@@ -50,7 +50,13 @@ npm run db:migrate
 
 Other scripts: `npm run db:generate` (Prisma Client) and `npm run db:studio` (browse tables). `prisma generate` also runs on `npm install` via `postinstall`.
 
-Sample game logs for seeding live in [`data/fixtures/game_logs_sample.csv`](data/fixtures/game_logs_sample.csv). See [`data/README.md`](data/README.md) for columns, ESPN source, and how a larger CSV will be passed into the PH-8 seed (`SEED_CSV_PATH`).
+### Seed fixture data
+
+```bash
+npm run seed
+```
+
+Default CSV is [`data/fixtures/game_logs_sample.csv`](data/fixtures/game_logs_sample.csv) (2 players, 24 game logs). Re-running is idempotent (upserts by player name and `(playerId, source, sourceGameId)`). Pass another file as `npm run seed -- path/to.csv` or `SEED_CSV_PATH=…`. Wipe tables first with `npm run seed -- --reset`. See [`data/README.md`](data/README.md) for columns, ESPN source, and re-run behavior.
 
 ## Learn More
 
