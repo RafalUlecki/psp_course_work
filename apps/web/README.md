@@ -18,6 +18,38 @@ npm run build
 npm run lint
 ```
 
+## Database (Prisma + Postgres)
+
+The app uses [Prisma](https://www.prisma.io/) against PostgreSQL. Connection string: `DATABASE_URL` in `.env` (see `.env.example`).
+
+1. Run a local Postgres instance (Docker example):
+
+```bash
+docker run --name prophover-postgres \
+  -e POSTGRES_USER=prophover \
+  -e POSTGRES_PASSWORD=prophover \
+  -e POSTGRES_DB=prophover \
+  -p 5432:5432 -d postgres:16
+```
+
+2. Copy `.env.example` to `.env` and set `DATABASE_URL`, for example:
+
+```bash
+DATABASE_URL="postgresql://prophover:prophover@localhost:5432/prophover"
+```
+
+3. Apply migrations:
+
+```bash
+# first-time / local schema changes
+npm run db:migrate:dev
+
+# apply existing migrations (empty or production-like DB)
+npm run db:migrate
+```
+
+Other scripts: `npm run db:generate` (Prisma Client) and `npm run db:studio` (browse tables). `prisma generate` also runs on `npm install` via `postinstall`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

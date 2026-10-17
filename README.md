@@ -2,6 +2,8 @@
 
 `apps/web` is the Next.js app. `apps/extension` is the Chrome MV3 extension stub.
 
+Postgres schema and migrations live in `apps/web/prisma/`. See [apps/web/README.md](apps/web/README.md#database-prisma--postgres) for how to run migrations against local Postgres.
+
 ## `apps/web` structure
 
 Each **page** or **app shell feature** lives in a private folder under `app/` (prefix `_` so it is not a URL segment). Inside the feature:
