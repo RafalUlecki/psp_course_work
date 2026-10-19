@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { after, afterEach, describe, it, mock } from "node:test";
+import { after, describe, it, mock } from "node:test";
 import type { GameLog, Venue } from "@prisma/client";
 import { prisma } from "./prisma";
-import { getGameLogsByPlayerId } from "./getGameLogsByPlayerId";
+import {
+  getGameLogsByPlayerId,
+  type GameLogReader,
+} from "./getGameLogsByPlayerId";
 
 const gameLog = (
   overrides: Pick<GameLog, "id" | "playerId" | "gameDate">,
@@ -17,11 +20,13 @@ const gameLog = (
   ...overrides,
 });
 
-describe("getGameLogsByPlayerId", () => {
-  afterEach(() => {
-    mock.restoreAll();
-  });
+type FindMany = GameLogReader["gameLog"]["findMany"];
 
+const readerWith = (findMany: FindMany): GameLogReader => ({
+  gameLog: { findMany },
+});
+
+describe("getGameLogsByPlayerId", () => {
   it("queries by playerId ordered by gameDate descending", async () => {
     const playerId = 1;
     const rows: GameLog[] = [
@@ -36,15 +41,17 @@ describe("getGameLogsByPlayerId", () => {
         gameDate: new Date("2026-03-18T00:00:00.000Z"),
       }),
     ];
-    const findMany = mock.method(prisma.gameLog, "findMany", async () => rows);
+    const findMany = mock.fn<FindMany>(async () => rows);
 
-    const result = await getGameLogsByPlayerId(playerId);
+    const result = await getGameLogsByPlayerId(playerId, readerWith(findMany));
 
     assert.equal(findMany.mock.callCount(), 1);
-    assert.deepEqual(findMany.mock.calls[0]?.arguments[0], {
-      where: { playerId },
-      orderBy: { gameDate: "desc" },
-    });
+    assert.deepEqual(findMany.mock.calls[0]?.arguments, [
+      {
+        where: { playerId },
+        orderBy: { gameDate: "desc" },
+      },
+    ]);
     assert.equal(result, rows);
     assert.ok(
       result[0]!.gameDate.getTime() > result[1]!.gameDate.getTime(),
@@ -53,24 +60,26 @@ describe("getGameLogsByPlayerId", () => {
   });
 
   it("returns an empty array for an unknown player id without throwing", async () => {
-    const findMany = mock.method(prisma.gameLog, "findMany", async () => []);
+    const findMany = mock.fn<FindMany>(async () => []);
 
-    const result = await getGameLogsByPlayerId(999_999);
+    const result = await getGameLogsByPlayerId(999_999, readerWith(findMany));
 
     assert.equal(findMany.mock.callCount(), 1);
-    assert.deepEqual(findMany.mock.calls[0]?.arguments[0], {
-      where: { playerId: 999_999 },
-      orderBy: { gameDate: "desc" },
-    });
+    assert.deepEqual(findMany.mock.calls[0]?.arguments, [
+      {
+        where: { playerId: 999_999 },
+        orderBy: { gameDate: "desc" },
+      },
+    ]);
     assert.deepEqual(result, []);
   });
 
   it("returns an empty array for a non-integer player id without querying", async () => {
-    const findMany = mock.method(prisma.gameLog, "findMany", async () => {
+    const findMany = mock.fn<FindMany>(async () => {
       throw new Error("findMany should not be called");
     });
 
-    const result = await getGameLogsByPlayerId(Number.NaN);
+    const result = await getGameLogsByPlayerId(Number.NaN, readerWith(findMany));
 
     assert.equal(findMany.mock.callCount(), 0);
     assert.deepEqual(result, []);
@@ -88,8 +97,6 @@ describe(
     });
 
     it("returns the seeded player's logs newest game_date first", async () => {
-      mock.restoreAll();
-
       const player = await prisma.player.findUnique({
         where: { name: "Nikola Jokic" },
       });
@@ -118,7 +125,6 @@ describe(
     });
 
     it("returns [] for an unknown player id and does not throw", async () => {
-      mock.restoreAll();
       const logs = await getGameLogsByPlayerId(999_999);
       assert.deepEqual(logs, []);
     });
