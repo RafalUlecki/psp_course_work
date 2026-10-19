@@ -24,6 +24,7 @@ const REQUIRED_COLUMNS = [
   "source_game_id",
 ] as const;
 
+type CsvColumn = (typeof REQUIRED_COLUMNS)[number];
 type CsvRecord = Record<string, string | undefined>;
 
 interface ParsedGameLog {
@@ -39,18 +40,69 @@ interface ParsedGameLog {
   sourceGameId: string;
 }
 
-function loadDotEnv() {
+interface SeedCliOptions {
+  reset: boolean;
+  csvPath: string;
+}
+
+interface UpsertGameLogsResult {
+  inserted: number;
+  updated: number;
+}
+
+interface BatchUpsertCounts {
+  batchInserted: number;
+  batchUpdated: number;
+}
+
+type GameLogMutableFields = Pick<
+  ParsedGameLog,
+  "gameDate" | "opponent" | "venue" | "pts" | "reb" | "ast"
+>;
+
+interface WrappedThrown {
+  value: object;
+}
+
+const formatThrownMessage = (
+  thrown: Error | string | WrappedThrown,
+): string => {
+  if (thrown instanceof Error) {
+    return thrown.message;
+  }
+  if (typeof thrown === "string") {
+    return thrown;
+  }
+  return String(thrown.value);
+};
+
+const wrapThrown = (
+  thrown: Error | string | object,
+): Error | string | WrappedThrown => {
+  if (thrown instanceof Error || typeof thrown === "string") {
+    return thrown;
+  }
+  return { value: thrown };
+};
+
+const messageFromCaught = (thrown: Error | string | object): string =>
+  formatThrownMessage(wrapThrown(thrown));
+
+const loadDotEnv = (): void => {
   const envPath = path.resolve(APP_ROOT, ".env");
   if (existsSync(envPath)) {
     process.loadEnvFile(envPath);
   }
-}
+};
 
 loadDotEnv();
 
 const prisma = new PrismaClient();
 
-function parseArgs(argv: string[]) {
+const rowError = (rowNumber: number, detail: string): Error =>
+  new Error(`Row ${rowNumber}: ${detail}`);
+
+const parseArgs = (argv: string[]): SeedCliOptions => {
   const flags = new Set<string>();
   const positional: string[] = [];
 
@@ -62,10 +114,10 @@ function parseArgs(argv: string[]) {
     }
   }
 
-  const unknownFlags = [...flags].filter((flag) => flag !== "--reset");
-  if (unknownFlags.length > 0) {
+  const unsupportedFlags = [...flags].filter((flag) => flag !== "--reset");
+  if (unsupportedFlags.length > 0) {
     throw new Error(
-      `Unknown flag(s): ${unknownFlags.join(", ")}. Supported: --reset`,
+      `Unsupported flag(s): ${unsupportedFlags.join(", ")}. Supported: --reset`,
     );
   }
 
@@ -75,38 +127,51 @@ function parseArgs(argv: string[]) {
       positional[0] ?? process.env.SEED_CSV_PATH ?? DEFAULT_CSV_PATH,
     ),
   };
-}
+};
 
-function requireString(
+const requireString = (
   record: CsvRecord,
-  column: (typeof REQUIRED_COLUMNS)[number],
+  column: CsvColumn,
   rowNumber: number,
-): string {
+): string => {
   const value = record[column];
   if (value === undefined || value.trim() === "") {
-    throw new Error(`Row ${rowNumber}: missing required field "${column}"`);
+    throw rowError(rowNumber, `missing required field "${column}"`);
   }
   return value.trim();
-}
+};
 
-function parseNonNegativeInt(
+const parseNonNegativeInt = (
   raw: string,
   column: string,
   rowNumber: number,
-): number {
+): number => {
   if (!/^\d+$/.test(raw)) {
-    throw new Error(
-      `Row ${rowNumber}: "${column}" must be a non-negative integer, got ${JSON.stringify(raw)}`,
+    throw rowError(
+      rowNumber,
+      `"${column}" must be a non-negative integer, got ${JSON.stringify(raw)}`,
     );
   }
   return Number(raw);
-}
+};
 
-function parseIsoDate(raw: string, rowNumber: number): Date {
+const parseRequiredIntColumn = (
+  record: CsvRecord,
+  column: Extract<CsvColumn, "pts" | "reb" | "ast">,
+  rowNumber: number,
+): number =>
+  parseNonNegativeInt(
+    requireString(record, column, rowNumber),
+    column,
+    rowNumber,
+  );
+
+const parseIsoDate = (raw: string, rowNumber: number): Date => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   if (!match) {
-    throw new Error(
-      `Row ${rowNumber}: "game_date" must be an ISO date (YYYY-MM-DD), got ${JSON.stringify(raw)}`,
+    throw rowError(
+      rowNumber,
+      `"game_date" must be an ISO date (YYYY-MM-DD), got ${JSON.stringify(raw)}`,
     );
   }
 
@@ -120,33 +185,54 @@ function parseIsoDate(raw: string, rowNumber: number): Date {
     date.getUTCMonth() !== month - 1 ||
     date.getUTCDate() !== day
   ) {
-    throw new Error(
-      `Row ${rowNumber}: "game_date" is not a valid calendar date, got ${JSON.stringify(raw)}`,
+    throw rowError(
+      rowNumber,
+      `"game_date" is not a valid calendar date, got ${JSON.stringify(raw)}`,
     );
   }
 
   return date;
-}
+};
 
-function parseVenue(raw: string, rowNumber: number): Venue {
+const parseVenue = (raw: string, rowNumber: number): Venue => {
   if (raw === Venue.home || raw === Venue.away) {
     return raw;
   }
-  throw new Error(
-    `Row ${rowNumber}: "venue" must be "home" or "away", got ${JSON.stringify(raw)}`,
+  throw rowError(
+    rowNumber,
+    `"venue" must be "home" or "away", got ${JSON.stringify(raw)}`,
   );
-}
+};
 
-function validateHeader(record: CsvRecord) {
+const validateHeader = (record: CsvRecord): void => {
   const missing = REQUIRED_COLUMNS.filter((column) => !(column in record));
   if (missing.length > 0) {
     throw new Error(
       `CSV header is missing required column(s): ${missing.join(", ")}. Expected: ${REQUIRED_COLUMNS.join(",")}`,
     );
   }
-}
+};
 
-function parseCsvRows(csvPath: string): ParsedGameLog[] {
+const parseGameLogRow = (
+  record: CsvRecord,
+  rowNumber: number,
+): ParsedGameLog => ({
+  playerName: requireString(record, "player_name", rowNumber),
+  team: requireString(record, "team", rowNumber),
+  gameDate: parseIsoDate(
+    requireString(record, "game_date", rowNumber),
+    rowNumber,
+  ),
+  opponent: requireString(record, "opponent", rowNumber),
+  venue: parseVenue(requireString(record, "venue", rowNumber), rowNumber),
+  pts: parseRequiredIntColumn(record, "pts", rowNumber),
+  reb: parseRequiredIntColumn(record, "reb", rowNumber),
+  ast: parseRequiredIntColumn(record, "ast", rowNumber),
+  source: requireString(record, "source", rowNumber),
+  sourceGameId: requireString(record, "source_game_id", rowNumber),
+});
+
+const parseCsvRows = (csvPath: string): ParsedGameLog[] => {
   if (!existsSync(csvPath)) {
     throw new Error(`CSV file not found: ${csvPath}`);
   }
@@ -160,9 +246,17 @@ function parseCsvRows(csvPath: string): ParsedGameLog[] {
       bom: true,
       relax_column_count: false,
     }) as CsvRecord[];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to parse CSV ${csvPath}: ${message}`);
+  } catch (thrown) {
+    if (
+      thrown instanceof Error ||
+      typeof thrown === "string" ||
+      (thrown !== null && typeof thrown === "object")
+    ) {
+      throw new Error(
+        `Failed to parse CSV ${csvPath}: ${messageFromCaught(thrown)}`,
+      );
+    }
+    throw new Error(`Failed to parse CSV ${csvPath}: ${String(thrown)}`);
   }
 
   if (records.length === 0) {
@@ -171,58 +265,45 @@ function parseCsvRows(csvPath: string): ParsedGameLog[] {
 
   validateHeader(records[0]);
 
-  return records.map((record, index) => {
-    const rowNumber = index + 2;
-    const team = requireString(record, "team", rowNumber);
-    return {
-      playerName: requireString(record, "player_name", rowNumber),
-      team,
-      gameDate: parseIsoDate(
-        requireString(record, "game_date", rowNumber),
-        rowNumber,
-      ),
-      opponent: requireString(record, "opponent", rowNumber),
-      venue: parseVenue(requireString(record, "venue", rowNumber), rowNumber),
-      pts: parseNonNegativeInt(
-        requireString(record, "pts", rowNumber),
-        "pts",
-        rowNumber,
-      ),
-      reb: parseNonNegativeInt(
-        requireString(record, "reb", rowNumber),
-        "reb",
-        rowNumber,
-      ),
-      ast: parseNonNegativeInt(
-        requireString(record, "ast", rowNumber),
-        "ast",
-        rowNumber,
-      ),
-      source: requireString(record, "source", rowNumber),
-      sourceGameId: requireString(record, "source_game_id", rowNumber),
-    };
-  });
-}
+  return records.map((record, index) => parseGameLogRow(record, index + 2));
+};
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const batches: T[][] = [];
+const chunk = <TItem>(items: TItem[], size: number): TItem[][] => {
+  const batches: TItem[][] = [];
   for (let i = 0; i < items.length; i += size) {
     batches.push(items.slice(i, i + size));
   }
   return batches;
-}
+};
 
-function latestTeamByPlayer(rows: ParsedGameLog[]): Map<string, string | null> {
+const latestTeamByPlayer = (
+  rows: ParsedGameLog[],
+): Map<string, string | null> => {
   const teams = new Map<string, string | null>();
   for (const row of rows) {
     teams.set(row.playerName, row.team);
   }
   return teams;
-}
+};
 
-async function upsertPlayers(
+const gameLogCompositeKey = (
+  playerId: number,
+  source: string,
+  sourceGameId: string,
+): string => `${playerId}\0${source}\0${sourceGameId}`;
+
+const gameLogMutableFields = (row: ParsedGameLog): GameLogMutableFields => ({
+  gameDate: row.gameDate,
+  opponent: row.opponent,
+  venue: row.venue,
+  pts: row.pts,
+  reb: row.reb,
+  ast: row.ast,
+});
+
+const upsertPlayers = async (
   teamsByName: Map<string, string | null>,
-): Promise<Map<string, number>> {
+): Promise<Map<string, number>> => {
   const names = [...teamsByName.keys()];
   const idsByName = new Map<string, number>();
 
@@ -243,122 +324,164 @@ async function upsertPlayers(
   }
 
   return idsByName;
-}
+};
 
-async function upsertGameLogs(
+const countBatchUpserts = (
+  batch: ParsedGameLog[],
+  playerIdsByName: Map<string, number>,
+  existingKeys: Set<string>,
+): BatchUpsertCounts => {
+  let batchInserted = 0;
+  let batchUpdated = 0;
+
+  for (const row of batch) {
+    const playerId = playerIdsByName.get(row.playerName);
+    if (playerId === undefined) {
+      throw new Error(`Missing player id for ${row.playerName}`);
+    }
+
+    const key = gameLogCompositeKey(playerId, row.source, row.sourceGameId);
+    if (existingKeys.has(key)) {
+      batchUpdated += 1;
+    } else {
+      batchInserted += 1;
+    }
+  }
+
+  return { batchInserted, batchUpdated };
+};
+
+const upsertGameLogBatch = async (
+  batch: ParsedGameLog[],
+  playerIdsByName: Map<string, number>,
+): Promise<BatchUpsertCounts> => {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.gameLog.findMany({
+      where: {
+        OR: batch.map((row) => ({
+          playerId: playerIdsByName.get(row.playerName)!,
+          source: row.source,
+          sourceGameId: row.sourceGameId,
+        })),
+      },
+      select: {
+        playerId: true,
+        source: true,
+        sourceGameId: true,
+      },
+    });
+
+    const existingKeys = new Set(
+      existing.map((row) =>
+        gameLogCompositeKey(row.playerId, row.source, row.sourceGameId),
+      ),
+    );
+
+    const counts = countBatchUpserts(batch, playerIdsByName, existingKeys);
+
+    for (const row of batch) {
+      const playerId = playerIdsByName.get(row.playerName);
+      if (playerId === undefined) {
+        throw new Error(`Missing player id for ${row.playerName}`);
+      }
+
+      const fields = gameLogMutableFields(row);
+
+      await tx.gameLog.upsert({
+        where: {
+          playerId_source_sourceGameId: {
+            playerId,
+            source: row.source,
+            sourceGameId: row.sourceGameId,
+          },
+        },
+        create: {
+          playerId,
+          source: row.source,
+          sourceGameId: row.sourceGameId,
+          ...fields,
+        },
+        update: fields,
+      });
+    }
+
+    return counts;
+  });
+};
+
+const upsertGameLogs = async (
   rows: ParsedGameLog[],
   playerIdsByName: Map<string, number>,
-): Promise<{ inserted: number; updated: number }> {
+): Promise<UpsertGameLogsResult> => {
   let inserted = 0;
   let updated = 0;
 
   for (const batch of chunk(rows, BATCH_SIZE)) {
-    const counts = await prisma.$transaction(async (tx) => {
-      let batchInserted = 0;
-      let batchUpdated = 0;
-
-      const existing = await tx.gameLog.findMany({
-        where: {
-          OR: batch.map((row) => ({
-            playerId: playerIdsByName.get(row.playerName)!,
-            source: row.source,
-            sourceGameId: row.sourceGameId,
-          })),
-        },
-        select: {
-          playerId: true,
-          source: true,
-          sourceGameId: true,
-        },
-      });
-
-      const existingKeys = new Set(
-        existing.map(
-          (row) => `${row.playerId}\0${row.source}\0${row.sourceGameId}`,
-        ),
-      );
-
-      for (const row of batch) {
-        const playerId = playerIdsByName.get(row.playerName);
-        if (playerId === undefined) {
-          throw new Error(`Missing player id for ${row.playerName}`);
-        }
-
-        const key = `${playerId}\0${row.source}\0${row.sourceGameId}`;
-        if (existingKeys.has(key)) {
-          batchUpdated += 1;
-        } else {
-          batchInserted += 1;
-        }
-
-        await tx.gameLog.upsert({
-          where: {
-            playerId_source_sourceGameId: {
-              playerId,
-              source: row.source,
-              sourceGameId: row.sourceGameId,
-            },
-          },
-          create: {
-            playerId,
-            gameDate: row.gameDate,
-            opponent: row.opponent,
-            venue: row.venue,
-            pts: row.pts,
-            reb: row.reb,
-            ast: row.ast,
-            source: row.source,
-            sourceGameId: row.sourceGameId,
-          },
-          update: {
-            gameDate: row.gameDate,
-            opponent: row.opponent,
-            venue: row.venue,
-            pts: row.pts,
-            reb: row.reb,
-            ast: row.ast,
-          },
-        });
-      }
-
-      return { batchInserted, batchUpdated };
-    });
-
+    const counts = await upsertGameLogBatch(batch, playerIdsByName);
     inserted += counts.batchInserted;
     updated += counts.batchUpdated;
   }
 
   return { inserted, updated };
-}
+};
 
-async function main() {
-  const { reset, csvPath } = parseArgs(process.argv.slice(2));
-  const rows = parseCsvRows(csvPath);
+const resetDatabase = async (): Promise<void> => {
+  await prisma.$transaction([
+    prisma.gameLog.deleteMany(),
+    prisma.player.deleteMany(),
+  ]);
+  console.log("Reset: deleted game_logs then players");
+};
 
-  if (reset) {
-    await prisma.$transaction([
-      prisma.gameLog.deleteMany(),
-      prisma.player.deleteMany(),
-    ]);
-    console.log("Reset: deleted game_logs then players");
-  }
-
-  const teamsByName = latestTeamByPlayer(rows);
-  const playerIdsByName = await upsertPlayers(teamsByName);
-  const { inserted, updated } = await upsertGameLogs(rows, playerIdsByName);
-
+const printSeedSummary = (props: {
+  csvPath: string;
+  playerCount: number;
+  inserted: number;
+  updated: number;
+}): void => {
+  const { csvPath, playerCount, inserted, updated } = props;
   console.log(`CSV: ${csvPath}`);
-  console.log(`Players upserted: ${playerIdsByName.size}`);
+  console.log(`Players upserted: ${playerCount}`);
   console.log(`Game logs inserted: ${inserted}`);
   console.log(`Game logs updated: ${updated}`);
-}
+};
 
-main()
-  .catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`Seed failed: ${message}`);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
+const main = async (): Promise<void> => {
+  const options = parseArgs(process.argv.slice(2));
+  const rows = parseCsvRows(options.csvPath);
+
+  if (options.reset) {
+    await resetDatabase();
+  }
+
+  const playerIdsByName = await upsertPlayers(latestTeamByPlayer(rows));
+  const { inserted, updated } = await upsertGameLogs(rows, playerIdsByName);
+
+  printSeedSummary({
+    csvPath: options.csvPath,
+    playerCount: playerIdsByName.size,
+    inserted,
+    updated,
   });
+};
+
+const runSeed = async (): Promise<void> => {
+  try {
+    await main();
+  } catch (thrown) {
+    if (
+      thrown instanceof Error ||
+      typeof thrown === "string" ||
+      (thrown !== null && typeof thrown === "object")
+    ) {
+      console.error(`Seed failed: ${messageFromCaught(thrown)}`);
+    } else {
+      console.error(`Seed failed: ${String(thrown)}`);
+    }
+    process.exitCode = 1;
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+runSeed();
