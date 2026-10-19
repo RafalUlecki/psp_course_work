@@ -1,6 +1,6 @@
 # Game-log data
 
-Small fixture used to seed `players` / `game_logs` (schema in `apps/web/prisma/`). The PH-8 seed script is not in this change; it will read a CSV in the column format below.
+Small fixture used to seed `players` / `game_logs` (schema in `apps/web/prisma/`). Load it with `npm run seed` from `apps/web` (Prisma Client upserts; no raw SQL).
 
 ## Fixture
 
@@ -15,7 +15,7 @@ Small fixture used to seed `players` / `game_logs` (schema in `apps/web/prisma/`
 
 ## Columns
 
-Header row maps 1:1 to the seed importer PH-8 will write:
+Header row maps 1:1 to the seed importer:
 
 ```
 player_name,team,game_date,opponent,venue,pts,reb,ast,source,source_game_id
@@ -23,7 +23,7 @@ player_name,team,game_date,opponent,venue,pts,reb,ast,source,source_game_id
 
 | Column | Meaning |
 | --- | --- |
-| `player_name` | Player display name (upsert key for `players.name` in the future seed) |
+| `player_name` | Player display name (upsert key for unique `players.name`) |
 | `team` | Player’s team abbreviation that night |
 | `game_date` | Tip-off calendar date `YYYY-MM-DD` in America/New_York (how ESPN lists the game) |
 | `opponent` | Opponent team abbreviation (ESPN’s codes; see note below) |
@@ -47,10 +47,48 @@ Last 12 regular-season appearances for each player in that season. ESPN opponent
 
 A full-season dump (for example a Kaggle or Hugging Face NBA game-log CSV) is **not** committed. Put a larger file next to this tree if you want one locally, e.g. `apps/web/data/nba_game_logs.full.csv`. `*.full.csv` under `apps/web/data/` is gitignored.
 
-The seed (PH-8) should accept a path to any CSV in the same column format, for example:
+The seed accepts a path to any CSV in the same column format. Default is this fixture.
+
+## Seed (CSV → Postgres)
+
+From `apps/web`, with `DATABASE_URL` set (see `.env.example`):
+
+```bash
+# apply migrations, then load the fixture
+npm run db:migrate
+npm run seed
+```
+
+`prisma db seed` runs the same script (`prisma.seed` in `package.json`).
+
+CSV path resolution, first match wins:
+
+1. Positional argument (`argv[2]`), e.g. `npx tsx prisma/seed.ts data/nba_game_logs.full.csv`
+2. `SEED_CSV_PATH`
+3. `data/fixtures/game_logs_sample.csv`
 
 ```bash
 SEED_CSV_PATH=data/nba_game_logs.full.csv npm run seed
+npm run seed -- data/nba_game_logs.full.csv
 ```
 
-Default path should be this fixture. Do not scrape HTML or download a full season in CI.
+Rows are validated before any writes (required columns, ISO `YYYY-MM-DD` dates, `home`/`away` venue, non-negative integer `pts`/`reb`/`ast`). A bad row fails the process with a `Row N: …` error and does not load remaining rows.
+
+### Re-run behavior (idempotent)
+
+Players are upserted by unique `players.name` (team is kept up to date). Game logs are upserted on `(playerId, source, sourceGameId)`, so a second run does **not** insert duplicates; box-score fields are refreshed from the CSV.
+
+The script prints `Players upserted`, `Game logs inserted`, and `Game logs updated`. After a first load of this fixture you should see 2 players and 24 logs; a second run still has 24 logs (0 inserted, 24 updated).
+
+### `--reset`
+
+Deletes **all** `game_logs` then **all** `players` (Prisma Client `deleteMany`, in that order) before loading. Validation still runs first, so a bad CSV will not wipe the database.
+
+```bash
+npm run seed -- --reset
+npm run seed -- --reset data/nba_game_logs.full.csv
+```
+
+`--reset` is destructive on the whole tables, not only rows present in the CSV.
+
+Do not scrape HTML or download a full season in CI.

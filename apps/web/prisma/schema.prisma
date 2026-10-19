@@ -14,7 +14,7 @@ enum Venue {
 
 model Player {
   id       Int       @id @default(autoincrement())
-  name     String
+  name     String    @unique
   team     String?
   gameLogs GameLog[]
 
