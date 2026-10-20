@@ -2,7 +2,7 @@ import type {
   GameLogReader,
   PlayerGameLogs,
 } from "./types/getGameLogsByPlayerId";
-import { prisma } from "./prisma";
+import { prisma } from "../prisma";
 
 export const getGameLogsByPlayerId = async (
   playerId: number,
