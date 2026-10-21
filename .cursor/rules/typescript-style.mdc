@@ -1,0 +1,34 @@
+---
+description: TypeScript style for PropHover
+globs: apps/web/**/*.ts
+alwaysApply: false
+---
+
+# TypeScript
+
+```typescript
+// ✅
+interface FilterGamesOptions {
+  lastN?: number;
+}
+
+const filterGames = (
+  games: GameLog[],
+  options: FilterGamesOptions = {},
+): GameLog[] => {
+  const { lastN } = options;
+  // ...
+};
+
+type PlayerId = number;
+```
+
+```typescript
+// ❌
+type FilterGamesOptions = { lastN?: number }; // use interface for objects
+function filterGames({ lastN }: FilterGamesOptions) {} // no destructure in params
+catch (e: unknown) {} // no unknown/any
+```
+
+- Prefer small pure helpers; one level of abstraction in exported functions.
+- Immutability: do not mutate input arrays/objects unless the API explicitly requires it.

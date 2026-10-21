@@ -1,0 +1,16 @@
+---
+description: Unit test style for apps/web
+globs: apps/web/**/*.test.ts
+alwaysApply: false
+---
+
+# Unit tests
+
+- `it("should return an empty array when games is empty", ...)`
+- One `assert` per test.
+- Structure: arrange → act → assert (blank lines OK; **no** Given/When/Then comments).
+- Mock DB ports; never import `prisma` in `*.test.ts` for default unit tests.
+- Integration/seed tests: separate file or `RUN_DB_TESTS=1` suite only.
+- Skip redundant tests: extra `findMany` callCount when return value already fails if uncalled; duplicate non-integer cases; `every()` when result ids already prove filter.
+
+Run: `cd apps/web && npm test`
