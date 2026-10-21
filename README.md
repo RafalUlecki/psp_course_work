@@ -2,6 +2,8 @@
 
 `apps/web` is the Next.js app. `apps/extension` is the Chrome MV3 extension stub.
 
+**AI / Cloud agents:** read [AGENTS.md](AGENTS.md) and [.cursor/rules/](.cursor/rules/) before implementing tasks.
+
 Postgres schema and migrations live in `apps/web/prisma/`. See [apps/web/README.md](apps/web/README.md#database-prisma--postgres) for how to run migrations against local Postgres.
 
 ## `apps/web` structure

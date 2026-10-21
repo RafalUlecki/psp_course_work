@@ -1,0 +1,13 @@
+---
+description: React and Next.js app structure
+globs: apps/web/**/*.tsx
+alwaysApply: false
+---
+
+# React / Next.js (`apps/web`)
+
+- Route files stay named `page.tsx`, `layout.tsx`; import from `app/_features/<name>/PageName.tsx` or `app/_app/`.
+- Components: `PascalCase.tsx`. Styled modules: `styles/camelCase.ts`.
+- `const Component = (props: Props): ReactElement => { const { x } = props; ... }`
+- `interface Props` for component props.
+- See `apps/web/AGENTS.md` for Next.js 16 notes when using App Router APIs.
