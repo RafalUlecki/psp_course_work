@@ -1,11 +1,8 @@
 import type { GameLog } from "@prisma/client";
 
+import { getGameLogsByPlayerId } from "../gameLogs/getGameLogsByPlayerId";
 import { computeHitRate } from "./computeHitRate";
 import { filterGames } from "./filterGames";
-import {
-  SAMPLE_HIT_RATE_PLAYER_ID,
-  sampleHitRateGames,
-} from "./fixtures/sampleGames";
 import { parseHitRateQuery } from "./query/parseHitRateQuery";
 import type { StatKey } from "./types/computeHitRate";
 import type {
@@ -23,9 +20,6 @@ interface ToHitRateGamesProps {
   games: GameLog[];
   stat: StatKey;
 }
-
-const gamesForPlayer = (playerId: string): GameLog[] =>
-  playerId === SAMPLE_HIT_RATE_PLAYER_ID ? sampleHitRateGames : [];
 
 const toHitRateGames = (props: ToHitRateGamesProps): HitRateGame[] => {
   const { games, stat } = props;
@@ -46,7 +40,12 @@ const echoFilters = (request: HitRateRequest): HitRateFilters => ({
   ...(request.venue !== undefined ? { venue: request.venue } : {}),
 });
 
-export const getHitRate = (props: GetHitRateProps): HitRateHttpResult => {
+export const getHitRate = async (
+  props: GetHitRateProps,
+  loadGameLogs: (
+    playerId: number,
+  ) => Promise<GameLog[]> = getGameLogsByPlayerId,
+): Promise<HitRateHttpResult> => {
   const { searchParams } = props;
   const parsed = parseHitRateQuery({ searchParams });
 
@@ -55,8 +54,8 @@ export const getHitRate = (props: GetHitRateProps): HitRateHttpResult => {
   }
 
   const { request } = parsed;
-  const games = filterGames(gamesForPlayer(request.playerId), {
-    lastN: request.lastN,
+  const games = filterGames(await loadGameLogs(Number(request.playerId)), {
+    lastN: request.lastN ?? 10,
     opponent: request.opponent,
     venue: request.venue,
   });

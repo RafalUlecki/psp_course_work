@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
+import type { GameLog } from "@prisma/client";
 import { getHitRate } from "./getHitRate";
-import { SAMPLE_HIT_RATE_PLAYER_ID } from "./fixtures/sampleGames";
+import {
+  SAMPLE_HIT_RATE_PLAYER_ID,
+  sampleHitRateGames,
+} from "./fixtures/sampleGames";
 import {
   hitRateQueryParamNames,
   type HitRateQueryParamName,
@@ -37,91 +41,119 @@ const requiredQuery: HitRateQuery = {
   line: "24.5",
 };
 
+const emptyShape = {
+  hitRate: null,
+  hits: 0,
+  n: 0,
+  games: [],
+};
+
+const loadFixtureGames = async (playerId: number): Promise<GameLog[]> =>
+  playerId === Number(SAMPLE_HIT_RATE_PLAYER_ID) ? sampleHitRateGames : [];
+
+const getHitRateForTests = (query: HitRateQuery) =>
+  getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
+
+const emptyResultShape = (result: Awaited<ReturnType<typeof getHitRate>>) =>
+  result.status === 200
+    ? {
+        hitRate: result.body.hitRate,
+        hits: result.body.hits,
+        n: result.body.n,
+        games: result.body.games,
+      }
+    : null;
+
 describe("getHitRate", () => {
-  it("should return hitRate 0.7 when fixture player and line 24.5 are used", () => {
-    const result = getHitRate({ searchParams: toSearchParams(requiredQuery) });
+  it("should return hitRate 0.7 when fixture player PTS lastN 10 and line 24.5 are used", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "10" });
 
     assert.equal(result.status === 200 ? result.body.hitRate : null, 0.7);
   });
 
-  it("should return hits 7 when fixture player and line 24.5 are used", () => {
-    const result = getHitRate({ searchParams: toSearchParams(requiredQuery) });
+  it("should return hits 7 when fixture player and line 24.5 are used", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "10" });
 
     assert.equal(result.status === 200 ? result.body.hits : null, 7);
   });
 
-  it("should return n 10 when fixture player and line 24.5 are used", () => {
-    const result = getHitRate({ searchParams: toSearchParams(requiredQuery) });
+  it("should return n 10 when lastN is omitted and the loader returns more than 10 games", async () => {
+    const extraOlderGames: GameLog[] = [
+      {
+        ...sampleHitRateGames[0],
+        id: 11,
+        gameDate: new Date("2026-03-01T00:00:00.000Z"),
+        pts: 99,
+        sourceGameId: "11",
+      },
+      {
+        ...sampleHitRateGames[0],
+        id: 12,
+        gameDate: new Date("2026-03-02T00:00:00.000Z"),
+        pts: 99,
+        sourceGameId: "12",
+      },
+    ];
+    const result = await getHitRate(
+      { searchParams: toSearchParams(requiredQuery) },
+      async () => [...sampleHitRateGames, ...extraOlderGames],
+    );
 
     assert.equal(result.status === 200 ? result.body.n : null, 10);
   });
 
-  it("should return ten games when fixture player and line 24.5 are used", () => {
-    const result = getHitRate({ searchParams: toSearchParams(requiredQuery) });
+  it("should return the empty shape when the loader returns no games", async () => {
+    const result = await getHitRate(
+      { searchParams: toSearchParams(requiredQuery) },
+      async () => [],
+    );
 
-    assert.equal(result.status === 200 ? result.body.games.length : null, 10);
+    assert.deepEqual(emptyResultShape(result), emptyShape);
   });
 
-  it("should return hitRate 1 when lastN is 5", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, lastN: "5" }),
+  it("should return the empty shape when opponent matches no games", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      opponent: "ZZZ",
     });
+
+    assert.deepEqual(emptyResultShape(result), emptyShape);
+  });
+
+  it("should call the loader with the playerId when playerId is provided", async () => {
+    const loadGameLogs = mock.fn(loadFixtureGames);
+
+    await getHitRate(
+      { searchParams: toSearchParams(requiredQuery) },
+      loadGameLogs,
+    );
+
+    assert.equal(
+      loadGameLogs.mock.calls[0]?.arguments[0],
+      Number(SAMPLE_HIT_RATE_PLAYER_ID),
+    );
+  });
+
+  it("should return hitRate 1 when lastN is 5", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "5" });
 
     assert.equal(result.status === 200 ? result.body.hitRate : null, 1);
   });
 
-  it("should return n 5 when lastN is 5", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, lastN: "5" }),
-    });
+  it("should return n 5 when lastN is 5", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "5" });
 
     assert.equal(result.status === 200 ? result.body.n : null, 5);
   });
 
-  it("should return null hitRate when filters match no fixture games", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, opponent: "ZZZ" }),
-    });
-
-    assert.equal(result.status === 200 ? result.body.hitRate : null, null);
-  });
-
-  it("should return empty games when filters match no fixture games", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, opponent: "ZZZ" }),
-    });
-
-    assert.deepEqual(result.status === 200 ? result.body.games : null, []);
-  });
-
-  it("should return null hitRate when playerId is not the fixture player", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, playerId: "999" }),
-    });
-
-    assert.equal(result.status === 200 ? result.body.hitRate : null, null);
-  });
-
-  it("should return empty games when playerId is not the fixture player", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, playerId: "999" }),
-    });
-
-    assert.deepEqual(result.status === 200 ? result.body.games : null, []);
-  });
-
-  it("should return 400 when playerId is omitted", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ stat: "PTS", line: "24.5" }),
-    });
+  it("should return 400 when playerId is omitted", async () => {
+    const result = await getHitRateForTests({ stat: "PTS", line: "24.5" });
 
     assert.equal(result.status, 400);
   });
 
-  it("should return Missing playerId when playerId is omitted", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ stat: "PTS", line: "24.5" }),
-    });
+  it("should return Missing playerId when playerId is omitted", async () => {
+    const result = await getHitRateForTests({ stat: "PTS", line: "24.5" });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
@@ -129,23 +161,19 @@ describe("getHitRate", () => {
     );
   });
 
-  it("should return 400 when line is omitted", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({
-        playerId: SAMPLE_HIT_RATE_PLAYER_ID,
-        stat: "PTS",
-      }),
+  it("should return 400 when line is omitted", async () => {
+    const result = await getHitRateForTests({
+      playerId: SAMPLE_HIT_RATE_PLAYER_ID,
+      stat: "PTS",
     });
 
     assert.equal(result.status, 400);
   });
 
-  it("should return Missing line when line is omitted", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({
-        playerId: SAMPLE_HIT_RATE_PLAYER_ID,
-        stat: "PTS",
-      }),
+  it("should return Missing line when line is omitted", async () => {
+    const result = await getHitRateForTests({
+      playerId: SAMPLE_HIT_RATE_PLAYER_ID,
+      stat: "PTS",
     });
 
     assert.equal(
@@ -154,10 +182,8 @@ describe("getHitRate", () => {
     );
   });
 
-  it("should return invalid stat error when stat is STL", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, stat: "STL" }),
-    });
+  it("should return invalid stat error when stat is STL", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, stat: "STL" });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
@@ -165,10 +191,8 @@ describe("getHitRate", () => {
     );
   });
 
-  it("should return invalid line error when line is not a number", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, line: "abc" }),
-    });
+  it("should return invalid line error when line is not a number", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, line: "abc" });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
@@ -176,10 +200,8 @@ describe("getHitRate", () => {
     );
   });
 
-  it("should return invalid lastN error when lastN is zero", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, lastN: "0" }),
-    });
+  it("should return invalid lastN error when lastN is zero", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "0" });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
@@ -187,14 +209,35 @@ describe("getHitRate", () => {
     );
   });
 
-  it("should return invalid venue error when venue is invalid", () => {
-    const result = getHitRate({
-      searchParams: toSearchParams({ ...requiredQuery, venue: "neutral" }),
+  it("should return invalid venue error when venue is invalid", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      venue: "neutral",
     });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
       INVALID_VENUE_ERROR,
     );
+  });
+});
+
+describe("getHitRate database", {
+  skip: process.env.RUN_DB_TESTS !== "1",
+}, () => {
+  it("should return hitRate 0.4 when seeded Jokic PTS last 10 games are compared to 24.5", async () => {
+    const { prisma } = await import("../prisma");
+    const player = await prisma.player.findUnique({
+      where: { name: "Nikola Jokic" },
+    });
+    const result = await getHitRate({
+      searchParams: new URLSearchParams({
+        playerId: String(player?.id),
+        stat: "PTS",
+        line: "24.5",
+      }),
+    });
+
+    assert.equal(result.status === 200 ? result.body.hitRate : null, 0.4);
   });
 });
