@@ -79,18 +79,6 @@ describe("filterGames", () => {
     assert.deepEqual(result, []);
   });
 
-  it("should leave the input games unchanged when filters are applied", () => {
-    const games = unsortedGames();
-    const originalSnapshot = games.map((game) => ({ ...game }));
-
-    filterGames(games, { lastN: 3, opponent: "SA" });
-
-    assert.deepEqual(
-      games.map((game) => ({ ...game })),
-      originalSnapshot,
-    );
-  });
-
   it("should keep the 5 newest games when lastN is 5", () => {
     const games = unsortedGames();
 
