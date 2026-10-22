@@ -1,5 +1,7 @@
 import type { GameLog, Venue } from "@prisma/client";
 
+export const SAMPLE_HIT_RATE_PLAYER_ID = "1";
+
 interface SampleGameInput {
   id: number;
   gameDate: string;
@@ -15,7 +17,7 @@ const buildSampleGame = (input: SampleGameInput): GameLog => {
 
   return {
     id,
-    playerId: 1,
+    playerId: Number(SAMPLE_HIT_RATE_PLAYER_ID),
     gameDate: new Date(`${gameDate}T00:00:00.000Z`),
     opponent,
     venue,
@@ -27,10 +29,6 @@ const buildSampleGame = (input: SampleGameInput): GameLog => {
   };
 };
 
-/**
- * Hard-coded stub logs for GET /api/hit-rate until PH-15 wires the DB.
- * Ten games, mixed opponents/venues. PTS vs 24.5 is 7/10 (hitRate 0.7).
- */
 export const sampleHitRateGames: GameLog[] = [
   buildSampleGame({
     id: 1,

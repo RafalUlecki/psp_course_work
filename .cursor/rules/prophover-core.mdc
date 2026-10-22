@@ -7,6 +7,6 @@ alwaysApply: true
 
 - Monorepo: `apps/web` (Next.js + Prisma), `apps/extension` (MV3).
 - Business logic lives in `apps/web/src/lib/<domain>/`, not in route handlers or React components.
-- `gameLogs/` = load/query `GameLog[]` (Prisma adapters). `hitRate/` = pure rules on logs (filter, isHit, calculate hit rate).
+- `gameLogs/` = load/query `GameLog[]` (Prisma adapters). `hitRate/` = pure rules on logs (filter, isHit, compute hit rate) + `query/` for URL → `HitRateRequest`.
 - Read root `AGENTS.md` and repo `README.md` for folder naming (`_features/`, `_app/`, PascalCase vs camelCase).
 - Do not commit `.env`. Do not add scope from the design doc unless the Linear task asks for it.

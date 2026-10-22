@@ -7,6 +7,7 @@
 - `apps/web` — Next.js App Router, TypeScript, Prisma → Postgres, `src/lib/` for business logic
 - `apps/extension` — Chrome MV3 stub
 - API: thin `app/api/**/route.ts` handlers → call `src/lib` → JSON (no business logic in routes)
+- Query/body validation at the boundary: **Zod** next to the parser (e.g. `hitRate/query/`; or `schemas/` when a domain uses that layout). Keep API error strings in that module’s `errors.ts`.
 
 ## Must-follow conventions
 
