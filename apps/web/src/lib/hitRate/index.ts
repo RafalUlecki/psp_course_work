@@ -10,3 +10,11 @@ export type {
   ValidateStatResult,
   ValidateStatSuccess,
 } from "./types/validateStat";
+export type {
+  HitRateErrorResponse,
+  HitRateFilters,
+  HitRateGame,
+  HitRateQueryParams,
+  HitRateRequest,
+  HitRateSuccessResponse,
+} from "./types/api";
