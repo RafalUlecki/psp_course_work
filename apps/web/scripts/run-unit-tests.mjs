@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const srcRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
+const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const collectTestFiles = (dir) => {
   const files = [];
@@ -21,10 +21,11 @@ const collectTestFiles = (dir) => {
   return files;
 };
 
-const testFiles = collectTestFiles(srcRoot);
+const testRoots = ["src", "app"].map((segment) => join(webRoot, segment));
+const testFiles = testRoots.flatMap(collectTestFiles);
 
 if (testFiles.length === 0) {
-  console.error("No *.test.ts files found under src/");
+  console.error("No *.test.ts files found under src/ or app/");
   process.exit(1);
 }
 
