@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   INVALID_LAST_N_ERROR,
   INVALID_LINE_ERROR,
+  INVALID_PLAYER_ID_ERROR,
   INVALID_STAT_ERROR,
   INVALID_VENUE_ERROR,
   MISSING_LINE_ERROR,
@@ -35,8 +36,14 @@ const venueSearchParamSchema = z
   .enum([Venue.home, Venue.away], { error: INVALID_VENUE_ERROR })
   .optional();
 
+const playerIdSearchParamSchema = z
+  .string({ error: MISSING_PLAYER_ID_ERROR })
+  .refine((value) => Number.isInteger(Number(value)), {
+    message: INVALID_PLAYER_ID_ERROR,
+  });
+
 const hitRateQueryObjectSchema = z.object({
-  playerId: z.string({ error: MISSING_PLAYER_ID_ERROR }),
+  playerId: playerIdSearchParamSchema,
   stat: statSearchParamSchema,
   line: lineSearchParamSchema,
   lastN: lastNSearchParamSchema,

@@ -13,6 +13,7 @@ import {
 import {
   INVALID_LAST_N_ERROR,
   INVALID_LINE_ERROR,
+  INVALID_PLAYER_ID_ERROR,
   INVALID_STAT_ERROR,
   INVALID_VENUE_ERROR,
   MISSING_LINE_ERROR,
@@ -153,6 +154,27 @@ describe("getHitRate", () => {
     assert.equal(result.status, 400);
   });
 
+  it("should return 400 when playerId is not a number", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      playerId: "abc",
+    });
+
+    assert.equal(result.status, 400);
+  });
+
+  it("should return Invalid playerId when playerId is not a number", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      playerId: "abc",
+    });
+
+    assert.equal(
+      result.status === 400 ? result.body.error : null,
+      INVALID_PLAYER_ID_ERROR,
+    );
+  });
+
   it("should return Missing playerId when playerId is omitted", async () => {
     const result = await getHitRateForTests({ stat: "PTS", line: "24.5" });
 
@@ -203,6 +225,15 @@ describe("getHitRate", () => {
 
   it("should return invalid lastN error when lastN is zero", async () => {
     const result = await getHitRateForTests({ ...requiredQuery, lastN: "0" });
+
+    assert.equal(
+      result.status === 400 ? result.body.error : null,
+      INVALID_LAST_N_ERROR,
+    );
+  });
+
+  it("should return invalid lastN error when lastN is negative", async () => {
+    const result = await getHitRateForTests({ ...requiredQuery, lastN: "-1" });
 
     assert.equal(
       result.status === 400 ? result.body.error : null,
