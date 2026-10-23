@@ -31,10 +31,9 @@ const lastNSearchParamSchema = z.optional(
     .positive(INVALID_LAST_N_ERROR),
 );
 
-const homeOrAway = z.union([z.literal(Venue.home), z.literal(Venue.away)]);
-const venueSearchParamSchema = z.union([z.undefined(), homeOrAway], {
-  error: INVALID_VENUE_ERROR,
-});
+const venueSearchParamSchema = z
+  .enum([Venue.home, Venue.away], { error: INVALID_VENUE_ERROR })
+  .optional();
 
 const hitRateQueryObjectSchema = z.object({
   playerId: z.string({ error: MISSING_PLAYER_ID_ERROR }),

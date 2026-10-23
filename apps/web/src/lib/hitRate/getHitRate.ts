@@ -11,10 +11,7 @@ import type {
   HitRateHttpResult,
   HitRateRequest,
 } from "./types/api";
-
-interface GetHitRateProps {
-  searchParams: URLSearchParams;
-}
+import type { GameLogLoader, GetHitRateProps } from "./types/getHitRate";
 
 interface ToHitRateGamesProps {
   games: GameLog[];
@@ -42,9 +39,7 @@ const echoFilters = (request: HitRateRequest): HitRateFilters => ({
 
 export const getHitRate = async (
   props: GetHitRateProps,
-  loadGameLogs: (
-    playerId: number,
-  ) => Promise<GameLog[]> = getGameLogsByPlayerId,
+  loadGameLogs: GameLogLoader = getGameLogsByPlayerId,
 ): Promise<HitRateHttpResult> => {
   const { searchParams } = props;
   const parsed = parseHitRateQuery({ searchParams });

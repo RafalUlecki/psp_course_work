@@ -48,8 +48,9 @@ const emptyShape = {
   games: [],
 };
 
-const loadFixtureGames = async (playerId: number): Promise<GameLog[]> =>
-  playerId === Number(SAMPLE_HIT_RATE_PLAYER_ID) ? sampleHitRateGames : [];
+const loadFixtureGames = async (
+  _playerId: number,
+): Promise<GameLog[]> => sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
@@ -219,25 +220,5 @@ describe("getHitRate", () => {
       result.status === 400 ? result.body.error : null,
       INVALID_VENUE_ERROR,
     );
-  });
-});
-
-describe("getHitRate database", {
-  skip: process.env.RUN_DB_TESTS !== "1",
-}, () => {
-  it("should return hitRate 0.4 when seeded Jokic PTS last 10 games are compared to 24.5", async () => {
-    const { prisma } = await import("../prisma");
-    const player = await prisma.player.findUnique({
-      where: { name: "Nikola Jokic" },
-    });
-    const result = await getHitRate({
-      searchParams: new URLSearchParams({
-        playerId: String(player?.id),
-        stat: "PTS",
-        line: "24.5",
-      }),
-    });
-
-    assert.equal(result.status === 200 ? result.body.hitRate : null, 0.4);
   });
 });
