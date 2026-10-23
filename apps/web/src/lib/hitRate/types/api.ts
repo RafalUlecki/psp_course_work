@@ -5,6 +5,7 @@ export interface HitRateRequest {
   playerId: string;
   stat: StatKey;
   line: number;
+  /** Defaults to 10 when omitted. */
   lastN?: number;
   opponent?: string;
   venue?: Venue;
