@@ -1,4 +1,5 @@
 export const MISSING_PLAYER_ID_ERROR = "Missing playerId.";
+export const INVALID_PLAYER_ID_ERROR = "Invalid playerId.";
 export const MISSING_LINE_ERROR = "Missing line.";
 export const INVALID_LINE_ERROR = "Invalid line. Must be a finite number.";
 export const INVALID_LAST_N_ERROR =
