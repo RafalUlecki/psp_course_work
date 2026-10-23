@@ -1,8 +1,11 @@
-const row = document.querySelector("[data-player][data-stat][data-line]");
+// Real sportsbook selectors are future work, out of the MVP demo.
+const row = document.querySelector(
+  "[data-prophover-row][data-prophover-player][data-prophover-stat][data-prophover-line]"
+);
 if (row) {
-  const player = row.getAttribute("data-player");
-  const stat = row.getAttribute("data-stat");
-  const line = row.getAttribute("data-line");
+  const player = row.getAttribute("data-prophover-player");
+  const stat = row.getAttribute("data-prophover-stat");
+  const line = row.getAttribute("data-prophover-line");
   console.log(`[PropHover] fixture detected: ${player} ${stat} ${line}`);
 
   let card = null;
