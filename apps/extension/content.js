@@ -1,6 +1,18 @@
 // Real sportsbook selectors are future work, out of the MVP demo.
 const LAST_N_DEFAULT = 10;
 const LAST_N_OPTIONS = [5, 10];
+const ALL_FILTER = "";
+const VENUE_OPTIONS = [
+  { value: ALL_FILTER, label: "All" },
+  { value: "home", label: "Home" },
+  { value: "away", label: "Away" },
+];
+
+const parseOpponentCodes = (raw) =>
+  (raw ?? "")
+    .split(",")
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0);
 
 const row = document.querySelector(
   "[data-prophover-row][data-prophover-player][data-prophover-stat][data-prophover-line][data-prophover-player-id]"
@@ -10,16 +22,33 @@ if (row) {
   const playerId = row.getAttribute("data-prophover-player-id");
   const stat = row.getAttribute("data-prophover-stat");
   const line = row.getAttribute("data-prophover-line");
+  const opponentCodes = parseOpponentCodes(
+    row.getAttribute("data-prophover-opponents")
+  );
   console.log(`[PropHover] fixture detected: ${player} ${stat} ${line}`);
 
   let card = null;
   let selectedLastN = LAST_N_DEFAULT;
+  let selectedOpponent = ALL_FILTER;
+  let selectedVenue = ALL_FILTER;
   let requestId = 0;
 
   const formatSummary = (hitRate, hits, n) => {
+    if (n === 0) {
+      return `${stat} over ${line} — Not enough data`;
+    }
     const percent = hitRate === null ? "—" : `${Math.round(hitRate * 100)}%`;
     return `${stat} over ${line} — ${percent} · ${hits}/${n}`;
   };
+
+  const controlStyle = [
+    "border:1px solid #666",
+    "background:#111",
+    "color:#fff",
+    "padding:4px 6px",
+    "border-radius:4px",
+    "font:12px/1.2 system-ui,sans-serif",
+  ].join(";");
 
   const toggleButtonStyle = (isSelected) =>
     [
@@ -56,7 +85,7 @@ if (row) {
     }
   };
 
-  const loadHitRate = async (lastN) => {
+  const loadHitRate = async () => {
     const currentRequest = ++requestId;
     setSummaryText("Loading…");
 
@@ -65,8 +94,14 @@ if (row) {
         playerId,
         stat,
         line,
-        lastN: String(lastN),
+        lastN: String(selectedLastN),
       });
+      if (selectedOpponent !== ALL_FILTER) {
+        params.set("opponent", selectedOpponent);
+      }
+      if (selectedVenue !== ALL_FILTER) {
+        params.set("venue", selectedVenue);
+      }
       const response = await fetch(`/api/hit-rate?${params.toString()}`);
       if (currentRequest !== requestId || !card) {
         return;
@@ -88,12 +123,45 @@ if (row) {
     }
   };
 
+  const createFilterSelect = (name, values, onChange) => {
+    const label = document.createElement("label");
+    label.style.cssText =
+      "display:flex;align-items:center;gap:6px;font:12px/1.2 system-ui,sans-serif";
+    label.append(name);
+
+    const select = document.createElement("select");
+    select.setAttribute(`data-prophover-${name.toLowerCase()}`, "");
+    select.style.cssText = controlStyle;
+
+    for (const optionValue of values) {
+      const option = document.createElement("option");
+      option.value = optionValue.value;
+      option.textContent = optionValue.label;
+      select.appendChild(option);
+    }
+
+    select.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    select.addEventListener("change", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onChange(select.value);
+      loadHitRate();
+    });
+
+    label.appendChild(select);
+    return label;
+  };
+
   const showCard = () => {
     if (card) {
       return;
     }
 
     selectedLastN = LAST_N_DEFAULT;
+    selectedOpponent = ALL_FILTER;
+    selectedVenue = ALL_FILTER;
     const rect = row.getBoundingClientRect();
     card = document.createElement("div");
     card.setAttribute("data-prophover-card", "");
@@ -139,17 +207,37 @@ if (row) {
         event.stopPropagation();
         selectedLastN = lastN;
         paintToggle();
-        loadHitRate(lastN);
+        loadHitRate();
       });
       toggle.appendChild(button);
     }
 
+    const filters = document.createElement("div");
+    filters.setAttribute("data-prophover-filters", "");
+    filters.style.cssText = "display:flex;gap:10px;align-items:center";
+
+    const opponentOptions = [
+      { value: ALL_FILTER, label: "All" },
+      ...opponentCodes.map((code) => ({ value: code, label: code })),
+    ];
+    filters.appendChild(
+      createFilterSelect("Opponent", opponentOptions, (value) => {
+        selectedOpponent = value;
+      })
+    );
+    filters.appendChild(
+      createFilterSelect("Venue", VENUE_OPTIONS, (value) => {
+        selectedVenue = value;
+      })
+    );
+
     panel.appendChild(summary);
     panel.appendChild(toggle);
+    panel.appendChild(filters);
     card.appendChild(panel);
     row.appendChild(card);
     paintToggle();
-    loadHitRate(selectedLastN);
+    loadHitRate();
   };
 
   const hideCard = () => {
