@@ -14,12 +14,16 @@ const LINE_DEBOUNCE_MS = 200;
 // Same-origin when empty. Point at a bad origin (e.g. "http://127.0.0.1:9") to force the error UI.
 const HIT_RATE_API_BASE = "";
 
+const hitRateCardState = globalThis.PropHoverHitRateCardState;
+if (!hitRateCardState) {
+  throw new Error("[PropHover] hitRateCardState.js must load before content.js");
+}
 const {
   HIT_RATE_CARD_LOADING_TEXT,
   createLatestRequestGuard,
   resolveHitRateCardStatus,
   resolveHitRateCardSummary,
-} = globalThis.PropHoverHitRateCardState;
+} = hitRateCardState;
 
 const parseOpponentCodes = (raw) =>
   (raw ?? "")
