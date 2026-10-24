@@ -72,7 +72,7 @@ if (row) {
         return;
       }
       if (!response.ok) {
-        setSummaryText("Couldn't load hit rate");
+        setSummaryText("error");
         return;
       }
       const body = await response.json();
@@ -84,7 +84,7 @@ if (row) {
       if (currentRequest !== requestId || !card) {
         return;
       }
-      setSummaryText("Couldn't load hit rate");
+      setSummaryText("error");
     }
   };
 
