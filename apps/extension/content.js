@@ -11,6 +11,15 @@ const LINE_STEP = 0.5;
 const LINE_RANGE = 10;
 const LINE_MIN = 0.5;
 const LINE_DEBOUNCE_MS = 200;
+// Same-origin when empty. Point at a bad origin (e.g. "http://127.0.0.1:9") to force the error UI.
+const HIT_RATE_API_BASE = "";
+
+const {
+  HIT_RATE_CARD_LOADING_TEXT,
+  createLatestRequestGuard,
+  resolveHitRateCardStatus,
+  resolveHitRateCardSummary,
+} = globalThis.PropHoverHitRateCardState;
 
 const parseOpponentCodes = (raw) =>
   (raw ?? "")
@@ -38,17 +47,9 @@ if (row) {
   let selectedOpponent = ALL_FILTER;
   let selectedVenue = ALL_FILTER;
   let selectedLine = fixtureLine;
-  let requestId = 0;
+  const requestGuard = createLatestRequestGuard();
   let lineDebounceTimer = null;
   let isLineSliderActive = false;
-
-  const formatSummary = (hitRate, hits, n) => {
-    if (n === 0) {
-      return `${stat} over ${selectedLine} — Not enough data`;
-    }
-    const percent = hitRate === null ? "—" : `${Math.round(hitRate * 100)}%`;
-    return `${stat} over ${selectedLine} — ${percent} · ${hits}/${n}`;
-  };
 
   const controlStyle = [
     "border:1px solid #666",
@@ -70,7 +71,7 @@ if (row) {
       "cursor:pointer",
     ].join(";");
 
-  const setSummaryText = (text) => {
+  const setCardState = (state) => {
     if (!card) {
       return;
     }
@@ -78,7 +79,14 @@ if (row) {
     if (!summary) {
       return;
     }
-    summary.textContent = text;
+    const payload =
+      state.status === "result"
+        ? { ...state, stat, line: selectedLine }
+        : state;
+    const viewStatus = resolveHitRateCardStatus(payload);
+    summary.setAttribute("data-prophover-state", viewStatus);
+    summary.style.color = viewStatus === "error" ? "#fca5a5" : "#fff";
+    summary.textContent = resolveHitRateCardSummary(payload);
   };
 
   const paintToggle = () => {
@@ -97,8 +105,8 @@ if (row) {
   const loadHitRate = async () => {
     clearTimeout(lineDebounceTimer);
     lineDebounceTimer = null;
-    const currentRequest = ++requestId;
-    setSummaryText("Loading…");
+    const currentRequest = requestGuard.begin();
+    setCardState({ status: "loading" });
 
     try {
       const params = new URLSearchParams({
@@ -113,30 +121,37 @@ if (row) {
       if (selectedVenue !== ALL_FILTER) {
         params.set("venue", selectedVenue);
       }
-      const response = await fetch(`/api/hit-rate?${params.toString()}`);
-      if (currentRequest !== requestId || !card) {
+      const response = await fetch(
+        `${HIT_RATE_API_BASE}/api/hit-rate?${params.toString()}`
+      );
+      if (!requestGuard.isCurrent(currentRequest) || !card) {
         return;
       }
       if (!response.ok) {
-        setSummaryText("error");
+        setCardState({ status: "error" });
         return;
       }
       const body = await response.json();
-      if (currentRequest !== requestId || !card) {
+      if (!requestGuard.isCurrent(currentRequest) || !card) {
         return;
       }
-      setSummaryText(formatSummary(body.hitRate, body.hits, body.n));
+      setCardState({
+        status: "result",
+        hitRate: body.hitRate,
+        hits: body.hits,
+        n: body.n,
+      });
     } catch {
-      if (currentRequest !== requestId || !card) {
+      if (!requestGuard.isCurrent(currentRequest) || !card) {
         return;
       }
-      setSummaryText("error");
+      setCardState({ status: "error" });
     }
   };
 
   const scheduleHitRateLoad = () => {
-    requestId += 1;
-    setSummaryText("Loading…");
+    requestGuard.invalidate();
+    setCardState({ status: "loading" });
     clearTimeout(lineDebounceTimer);
     lineDebounceTimer = setTimeout(() => {
       lineDebounceTimer = null;
@@ -285,8 +300,9 @@ if (row) {
 
     const summary = document.createElement("div");
     summary.setAttribute("data-prophover-summary", "");
+    summary.setAttribute("data-prophover-state", "loading");
     summary.style.whiteSpace = "nowrap";
-    summary.textContent = "Loading…";
+    summary.textContent = HIT_RATE_CARD_LOADING_TEXT;
 
     const toggle = document.createElement("div");
     toggle.setAttribute("data-prophover-last-n-toggle", "");
@@ -342,7 +358,7 @@ if (row) {
     }
     clearTimeout(lineDebounceTimer);
     lineDebounceTimer = null;
-    requestId += 1;
+    requestGuard.invalidate();
     if (!card) {
       return;
     }
