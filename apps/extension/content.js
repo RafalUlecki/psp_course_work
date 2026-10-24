@@ -7,6 +7,10 @@ const VENUE_OPTIONS = [
   { value: "home", label: "Home" },
   { value: "away", label: "Away" },
 ];
+const LINE_STEP = 0.5;
+const LINE_RANGE = 10;
+const LINE_MIN = 0.5;
+const LINE_DEBOUNCE_MS = 200;
 
 const parseOpponentCodes = (raw) =>
   (raw ?? "")
@@ -21,24 +25,29 @@ if (row) {
   const player = row.getAttribute("data-prophover-player");
   const playerId = row.getAttribute("data-prophover-player-id");
   const stat = row.getAttribute("data-prophover-stat");
-  const line = row.getAttribute("data-prophover-line");
+  const fixtureLine = Number(row.getAttribute("data-prophover-line"));
+  const lineMin = Math.max(LINE_MIN, fixtureLine - LINE_RANGE);
+  const lineMax = fixtureLine + LINE_RANGE;
   const opponentCodes = parseOpponentCodes(
     row.getAttribute("data-prophover-opponents")
   );
-  console.log(`[PropHover] fixture detected: ${player} ${stat} ${line}`);
+  console.log(`[PropHover] fixture detected: ${player} ${stat} ${fixtureLine}`);
 
   let card = null;
   let selectedLastN = LAST_N_DEFAULT;
   let selectedOpponent = ALL_FILTER;
   let selectedVenue = ALL_FILTER;
+  let selectedLine = fixtureLine;
   let requestId = 0;
+  let lineDebounceTimer = null;
+  let isLineSliderActive = false;
 
   const formatSummary = (hitRate, hits, n) => {
     if (n === 0) {
-      return `${stat} over ${line} — Not enough data`;
+      return `${stat} over ${selectedLine} — Not enough data`;
     }
     const percent = hitRate === null ? "—" : `${Math.round(hitRate * 100)}%`;
-    return `${stat} over ${line} — ${percent} · ${hits}/${n}`;
+    return `${stat} over ${selectedLine} — ${percent} · ${hits}/${n}`;
   };
 
   const controlStyle = [
@@ -86,6 +95,8 @@ if (row) {
   };
 
   const loadHitRate = async () => {
+    clearTimeout(lineDebounceTimer);
+    lineDebounceTimer = null;
     const currentRequest = ++requestId;
     setSummaryText("Loading…");
 
@@ -93,7 +104,7 @@ if (row) {
       const params = new URLSearchParams({
         playerId,
         stat,
-        line,
+        line: String(selectedLine),
         lastN: String(selectedLastN),
       });
       if (selectedOpponent !== ALL_FILTER) {
@@ -121,6 +132,89 @@ if (row) {
       }
       setSummaryText("error");
     }
+  };
+
+  const scheduleHitRateLoad = () => {
+    requestId += 1;
+    setSummaryText("Loading…");
+    clearTimeout(lineDebounceTimer);
+    lineDebounceTimer = setTimeout(() => {
+      lineDebounceTimer = null;
+      loadHitRate();
+    }, LINE_DEBOUNCE_MS);
+  };
+
+  const stopEventLeak = (event) => {
+    event.stopPropagation();
+  };
+
+  const createLineSlider = () => {
+    const wrap = document.createElement("label");
+    wrap.setAttribute("data-prophover-line-control", "");
+    wrap.style.cssText =
+      "display:flex;align-items:center;gap:8px;font:12px/1.2 system-ui,sans-serif";
+    wrap.append("Line");
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = String(lineMin);
+    slider.max = String(lineMax);
+    slider.step = String(LINE_STEP);
+    slider.value = String(selectedLine);
+    slider.setAttribute("data-prophover-line-slider", "");
+    slider.style.cssText = "width:140px;cursor:pointer";
+
+    const value = document.createElement("span");
+    value.setAttribute("data-prophover-line-value", "");
+    value.textContent = String(selectedLine);
+
+    for (const type of [
+      "pointerdown",
+      "pointerup",
+      "pointermove",
+      "pointercancel",
+      "mousedown",
+      "mouseup",
+      "mousemove",
+      "click",
+      "touchstart",
+      "touchend",
+      "touchmove",
+    ]) {
+      slider.addEventListener(type, stopEventLeak);
+    }
+
+    slider.addEventListener("pointerdown", (event) => {
+      isLineSliderActive = true;
+      if (typeof slider.setPointerCapture === "function") {
+        slider.setPointerCapture(event.pointerId);
+      }
+    });
+
+    const endSliderDrag = (event) => {
+      isLineSliderActive = false;
+      const underPointer = document.elementFromPoint(
+        event.clientX,
+        event.clientY
+      );
+      if (!underPointer || !row.contains(underPointer)) {
+        hideCard();
+      }
+    };
+
+    slider.addEventListener("pointerup", endSliderDrag);
+    slider.addEventListener("pointercancel", endSliderDrag);
+    slider.addEventListener("input", (event) => {
+      event.stopPropagation();
+      selectedLine = Number(slider.value);
+      value.textContent = String(selectedLine);
+      scheduleHitRateLoad();
+    });
+    slider.addEventListener("change", stopEventLeak);
+
+    wrap.appendChild(slider);
+    wrap.appendChild(value);
+    return wrap;
   };
 
   const createFilterSelect = (name, values, onChange) => {
@@ -162,6 +256,7 @@ if (row) {
     selectedLastN = LAST_N_DEFAULT;
     selectedOpponent = ALL_FILTER;
     selectedVenue = ALL_FILTER;
+    selectedLine = fixtureLine;
     const rect = row.getBoundingClientRect();
     card = document.createElement("div");
     card.setAttribute("data-prophover-card", "");
@@ -233,6 +328,7 @@ if (row) {
 
     panel.appendChild(summary);
     panel.appendChild(toggle);
+    panel.appendChild(createLineSlider());
     panel.appendChild(filters);
     card.appendChild(panel);
     row.appendChild(card);
@@ -241,6 +337,11 @@ if (row) {
   };
 
   const hideCard = () => {
+    if (isLineSliderActive) {
+      return;
+    }
+    clearTimeout(lineDebounceTimer);
+    lineDebounceTimer = null;
     requestId += 1;
     if (!card) {
       return;
