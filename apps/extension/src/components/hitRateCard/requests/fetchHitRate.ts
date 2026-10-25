@@ -13,7 +13,10 @@ export const fetchHitRate = async (
   props: FetchHitRateProps,
 ): Promise<HitRateSuccessResponse> => {
   const { playerId, stat, line, lastN, opponent, venue } = props;
-  const apiBase = import.meta.env.VITE_HIT_RATE_API_BASE ?? "";
+  // Single API-origin constant. Set VITE_HIT_RATE_API_BASE in apps/extension/.env
+  // (see .env.example). Local dev should match NEXT_PUBLIC_API_BASE_URL in
+  // apps/web/.env.example. Empty string = same-origin relative /api/hit-rate.
+  const HIT_RATE_API_BASE = import.meta.env.VITE_HIT_RATE_API_BASE ?? "";
 
   const params = new URLSearchParams({
     playerId,
@@ -30,7 +33,9 @@ export const fetchHitRate = async (
     params.set("venue", venue);
   }
 
-  const response = await fetch(`${apiBase}/api/hit-rate?${params.toString()}`);
+  const response = await fetch(
+    `${HIT_RATE_API_BASE}/api/hit-rate?${params.toString()}`,
+  );
 
   if (!response.ok) {
     throw new Error("Hit rate request failed");

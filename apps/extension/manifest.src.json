@@ -3,9 +3,13 @@
   "name": "PropHover",
   "version": "0.1.0",
   "description": "PropHover Chrome extension (fixture hover card).",
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://YOUR_HOSTED_API_ORIGIN.example/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["http://localhost:3000/fixture/*"],
+      "matches": ["http://localhost/fixture/*"],
       "js": ["content.js"]
     }
   ]
