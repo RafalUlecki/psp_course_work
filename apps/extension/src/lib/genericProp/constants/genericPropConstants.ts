@@ -1,0 +1,8 @@
+export const PROCESSED_ROW_ATTR = "data-prophover-processed";
+export const OVERLAY_HOST_ATTR = "data-prophover-overlay";
+export const POINTS_STAT = "PTS";
+export const POINTS_HEADER_MARK = "taškai";
+export const COMBO_HEADER_MARK = "+";
+export const DECIMAL_NUMBER_PATTERN = /(\d+\.\d+)/;
+export const FETCH_HIT_RATE_MESSAGE = "FETCH_HIT_RATE" as const;
+export const HIT_RATE_API_PATH = "/api/hit-rate";

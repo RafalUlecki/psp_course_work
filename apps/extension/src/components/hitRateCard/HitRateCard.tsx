@@ -118,7 +118,14 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
   return (
     <CardAnchor style={{ top: anchorTop, left: anchorLeft }}>
       <HitRateCardGlobalStyle />
-      <Panel data-prophover-card="">
+      <Panel
+        data-prophover-card=""
+        onClick={stop}
+        onMouseDown={stop}
+        onMouseUp={stop}
+        onPointerDown={stop}
+        onPointerUp={stop}
+      >
         <Summary
           data-prophover-summary=""
           data-prophover-state={viewStatus}

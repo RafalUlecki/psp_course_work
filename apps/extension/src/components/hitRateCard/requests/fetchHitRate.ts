@@ -1,3 +1,9 @@
+import { FETCH_HIT_RATE_MESSAGE } from "../../../lib/genericProp/constants/genericPropConstants";
+import type {
+  FetchHitRateMessage,
+  FetchHitRateResponse,
+  FetchHitRateSuccessResponse,
+} from "../../../lib/genericProp/types/hitRateMessage";
 import type { HitRateSuccessResponse } from "../types/hitRateApi";
 
 export interface FetchHitRateProps {
@@ -9,35 +15,30 @@ export interface FetchHitRateProps {
   venue: string;
 }
 
+const isOkResponse = (
+  response: FetchHitRateResponse,
+): response is FetchHitRateSuccessResponse => response.ok;
+
 export const fetchHitRate = async (
   props: FetchHitRateProps,
 ): Promise<HitRateSuccessResponse> => {
   const { playerId, stat, line, lastN, opponent, venue } = props;
-  const HIT_RATE_API_BASE = import.meta.env.VITE_HIT_RATE_API_BASE ?? "";
-
-  const params = new URLSearchParams({
+  const message: FetchHitRateMessage = {
+    type: FETCH_HIT_RATE_MESSAGE,
     playerId,
     stat,
-    line: String(line),
-    lastN: String(lastN),
-  });
+    line,
+    lastN,
+    opponent,
+    venue,
+  };
+  const response = (await chrome.runtime.sendMessage(
+    message,
+  )) as FetchHitRateResponse;
 
-  if (opponent.length > 0) {
-    params.set("opponent", opponent);
-  }
-
-  if (venue.length > 0) {
-    params.set("venue", venue);
-  }
-
-  const response = await fetch(
-    `${HIT_RATE_API_BASE}/api/hit-rate?${params.toString()}`,
-  );
-
-  if (!response.ok) {
+  if (!isOkResponse(response)) {
     throw new Error("Hit rate request failed");
   }
 
-  const body: HitRateSuccessResponse = await response.json();
-  return body;
+  return response.body;
 };

@@ -3,13 +3,16 @@
   "name": "PropHover",
   "version": "0.1.0",
   "description": "PropHover Chrome extension (fixture hover card).",
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "http://localhost:3000/*",
     "https://YOUR_HOSTED_API_ORIGIN.example/*"
   ],
   "content_scripts": [
     {
-      "matches": ["http://localhost/fixture/*"],
+      "matches": ["http://localhost/fixture/*", "https://www.betsson.lt/*"],
       "js": ["content.js"]
     }
   ]

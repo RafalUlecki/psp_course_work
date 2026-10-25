@@ -1,3 +1,6 @@
 import { findAndMountFixtureHover } from "./components/fixtureHoverRoot/FixtureHoverRoot";
+import { startGenericPropHover } from "./components/genericPropHover/GenericPropHoverRoot";
 
-findAndMountFixtureHover();
+if (!findAndMountFixtureHover()) {
+  startGenericPropHover();
+}

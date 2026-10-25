@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="lt">
+  <head>
+    <meta charset="utf-8" />
+    <title>PropHover generic rows</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 1rem;
+      }
+      .selection-row {
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="betslip">Kortelė(0)</div>
+    <div id="layout-probe">layout-probe</div>
+
+    <section>
+      <h2>Žaidėjo pelnyti taškai</h2>
+      <div id="doncic-points-row" class="selection-row">
+        <span>Luka Doncic </span>
+        <div>Daugiau 30.5</div>
+        <div>1.80</div>
+        <div>Mažiau 30.5</div>
+        <div>1.90</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Žaidėjo taškai + atkovoti kamuoliai</h2>
+      <div id="reaves-combo-row" class="selection-row">
+        <span>Austin Reaves </span>
+        <div>Daugiau 12.5</div>
+        <div>1.80</div>
+        <div>Mažiau 12.5</div>
+        <div>1.90</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Žaidėjo atkovoti kamuoliai</h2>
+      <div id="jokic-rebounds-row" class="selection-row">
+        <span>Nikola Jokic </span>
+        <div>Daugiau 10.5</div>
+        <div>1.80</div>
+        <div>Mažiau 10.5</div>
+        <div>1.90</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Žaidėjo pelnyti taškai</h2>
+      <div id="unknown-points-row" class="selection-row">
+        <span>Not A Player </span>
+        <div>Daugiau 20.5</div>
+        <div>1.80</div>
+        <div>Mažiau 20.5</div>
+        <div>1.90</div>
+      </div>
+    </section>
+
+    <script>
+      let count = 0;
+      const betslip = document.getElementById("betslip");
+      document.querySelectorAll(".selection-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          count += 1;
+          betslip.textContent = "Kortelė(" + count + ")";
+        });
+      });
+    </script>
+  </body>
+</html>

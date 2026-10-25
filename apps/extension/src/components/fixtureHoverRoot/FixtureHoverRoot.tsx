@@ -71,15 +71,15 @@ const FixtureHoverRoot = (props: FixtureHoverRootProps): ReactElement => {
   );
 };
 
-export const findAndMountFixtureHover = (): void => {
+export const findAndMountFixtureHover = (): boolean => {
   const row = document.querySelector<HTMLElement>(FIXTURE_ROW_SELECTOR);
   if (!row) {
-    return;
+    return false;
   }
 
   const fixture = readFixtureRow(row);
   if (!fixture) {
-    return;
+    return true;
   }
 
   const shadowHost = document.createElement("div");
@@ -96,4 +96,6 @@ export const findAndMountFixtureHover = (): void => {
       </StyleSheetManager>
     </QueryClientProvider>,
   );
+
+  return true;
 };
