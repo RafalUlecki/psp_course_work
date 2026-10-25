@@ -13,9 +13,6 @@ export const fetchHitRate = async (
   props: FetchHitRateProps,
 ): Promise<HitRateSuccessResponse> => {
   const { playerId, stat, line, lastN, opponent, venue } = props;
-  // Single API-origin constant. Set VITE_HIT_RATE_API_BASE in apps/extension/.env
-  // (see .env.example). Local dev should match NEXT_PUBLIC_API_BASE_URL in
-  // apps/web/.env.example. Empty string = same-origin relative /api/hit-rate.
   const HIT_RATE_API_BASE = import.meta.env.VITE_HIT_RATE_API_BASE ?? "";
 
   const params = new URLSearchParams({
