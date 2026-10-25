@@ -1,0 +1,10 @@
+{
+  "name": "psp_course_work",
+  "private": true,
+  "scripts": {
+    "start": "concurrently -n web,ext -c cyan,magenta \"npm run dev --prefix apps/web\" \"npm run dev --prefix apps/extension\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
