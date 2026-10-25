@@ -20,6 +20,7 @@ import {
   MISSING_LINE_ERROR,
   MISSING_PLAYER_ID_ERROR,
 } from "./query/errors";
+import type { GameLogLoader } from "./types/getHitRate";
 
 type HitRateQuery = Partial<Record<HitRateQueryParamName, string>>;
 
@@ -50,9 +51,7 @@ const emptyShape = {
   games: [],
 };
 
-const loadFixtureGames = async (
-  _playerId: number,
-): Promise<PlayerGame[]> => sampleHitRateGames;
+const loadFixtureGames: GameLogLoader = async () => sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
@@ -64,6 +63,15 @@ const emptyResultShape = (result: Awaited<ReturnType<typeof getHitRate>>) =>
         hits: result.body.hits,
         n: result.body.n,
         games: result.body.games,
+      }
+    : null;
+
+const hitRateStats = (result: Awaited<ReturnType<typeof getHitRate>>) =>
+  result.status === 200
+    ? {
+        hitRate: result.body.hitRate,
+        hits: result.body.hits,
+        n: result.body.n,
       }
     : null;
 
@@ -121,8 +129,45 @@ describe("getHitRate", () => {
     assert.deepEqual(emptyResultShape(result), emptyShape);
   });
 
+  it("should return hitRate 1, hits 2, and n 2 when lastN is 3 and opponent is UTAH", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "3",
+      opponent: "UTAH",
+    });
+
+    assert.deepEqual(hitRateStats(result), { hitRate: 1, hits: 2, n: 2 });
+  });
+
+  it("should return hitRate 1, hits 1, and n 1 when lastN is 3 opponent is UTAH and venue is home", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "3",
+      opponent: "UTAH",
+      venue: "home",
+    });
+
+    assert.deepEqual(hitRateStats(result), { hitRate: 1, hits: 1, n: 1 });
+  });
+
+  it("should return the empty shape when lastN is 5 opponent is MEM and venue is home", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "5",
+      opponent: "MEM",
+      venue: "home",
+    });
+
+    assert.deepEqual(emptyResultShape(result), emptyShape);
+  });
+
   it("should call the loader with the playerId when playerId is provided", async () => {
-    const loadGameLogs = mock.fn(loadFixtureGames);
+    const loadGameLogs = mock.fn(
+      async (playerId: number): Promise<PlayerGame[]> =>
+        playerId === Number(SAMPLE_HIT_RATE_PLAYER_ID)
+          ? sampleHitRateGames
+          : [],
+    );
 
     await getHitRate(
       { searchParams: toSearchParams(requiredQuery) },
