@@ -50,9 +50,8 @@ const emptyShape = {
   games: [],
 };
 
-const loadFixtureGames = async (
-  _playerId: number,
-): Promise<PlayerGame[]> => sampleHitRateGames;
+const loadFixtureGames = async (_playerId: number): Promise<PlayerGame[]> =>
+  sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
@@ -130,7 +129,6 @@ describe("getHitRate", () => {
     assert.deepEqual(emptyResultShape(result), emptyShape);
   });
 
-  // Combined filters: opponent/venue first, then lastN (see filterGames).
   it("should return hitRate 1, hits 2, and n 2 when lastN is 3 and opponent is UTAH", async () => {
     const result = await getHitRateForTests({
       ...requiredQuery,

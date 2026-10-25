@@ -102,8 +102,6 @@ describe("filterGames", () => {
     assert.deepEqual(idsOf(result), [5, 4, 1]);
   });
 
-  // Combined filters: newest-first, then opponent/venue, then lastN.
-  // lastN on the full timeline first would drop older matching games.
   it("should apply lastN after opponent and venue filters", () => {
     const games = unsortedGames();
 
