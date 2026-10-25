@@ -1,6 +1,8 @@
 import type { GameLog } from "@prisma/client";
 
-export type PlayerGameLogs = GameLog[];
+import type { PlayerGame } from "./playerGame";
+
+export type PlayerGameLogs = PlayerGame[];
 
 export type GameLogsByPlayerQuery = {
   where: { playerId: number };

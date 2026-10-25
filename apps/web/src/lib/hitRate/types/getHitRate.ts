@@ -1,6 +1,6 @@
-import type { GameLog } from "@prisma/client";
+import type { PlayerGame } from "../../gameLogs/types/playerGame";
 
-export type GameLogLoader = (playerId: number) => Promise<GameLog[]>;
+export type GameLogLoader = (playerId: number) => Promise<PlayerGame[]>;
 
 export interface GetHitRateProps {
   searchParams: URLSearchParams;

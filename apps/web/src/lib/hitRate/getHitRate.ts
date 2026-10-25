@@ -1,6 +1,5 @@
-import type { GameLog } from "@prisma/client";
-
 import { getGameLogsByPlayerId } from "../gameLogs/getGameLogsByPlayerId";
+import type { PlayerGame } from "../gameLogs/types/playerGame";
 import { computeHitRate } from "./computeHitRate";
 import { filterGames } from "./filterGames";
 import { parseHitRateQuery } from "./query/parseHitRateQuery";
@@ -14,7 +13,7 @@ import type {
 import type { GameLogLoader, GetHitRateProps } from "./types/getHitRate";
 
 interface ToHitRateGamesProps {
-  games: GameLog[];
+  games: PlayerGame[];
   stat: StatKey;
 }
 
@@ -49,7 +48,7 @@ export const getHitRate = async (
   }
 
   const { request } = parsed;
-  const games = filterGames(await loadGameLogs(Number(request.playerId)), {
+  const games = filterGames(await loadGameLogs(request.playerId), {
     lastN: request.lastN ?? 10,
     opponent: request.opponent,
     venue: request.venue,

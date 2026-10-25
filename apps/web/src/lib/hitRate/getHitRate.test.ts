@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
-import type { GameLog } from "@prisma/client";
+
+import type { PlayerGame } from "../gameLogs/types/playerGame";
 import { getHitRate } from "./getHitRate";
 import {
   SAMPLE_HIT_RATE_PLAYER_ID,
@@ -51,7 +52,7 @@ const emptyShape = {
 
 const loadFixtureGames = async (
   _playerId: number,
-): Promise<GameLog[]> => sampleHitRateGames;
+): Promise<PlayerGame[]> => sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
@@ -80,20 +81,18 @@ describe("getHitRate", () => {
   });
 
   it("should return n 10 when lastN is omitted and the loader returns more than 10 games", async () => {
-    const extraOlderGames: GameLog[] = [
+    const extraOlderGames: PlayerGame[] = [
       {
         ...sampleHitRateGames[0],
         id: 11,
         gameDate: new Date("2026-03-01T00:00:00.000Z"),
         pts: 99,
-        sourceGameId: "11",
       },
       {
         ...sampleHitRateGames[0],
         id: 12,
         gameDate: new Date("2026-03-02T00:00:00.000Z"),
         pts: 99,
-        sourceGameId: "12",
       },
     ];
     const result = await getHitRate(

@@ -1,20 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
-import type { GameLog, Venue } from "@prisma/client";
+import type { GameLog } from "@prisma/client";
+
 import { getGameLogsByPlayerId } from "./getGameLogsByPlayerId";
+import type { PlayerGame } from "./types/playerGame";
 import type { GameLogReader } from "./types/getGameLogsByPlayerId";
 
 const buildGameLog = (
   overrides: Pick<GameLog, "id" | "playerId" | "gameDate">,
 ): GameLog => ({
   opponent: "SA",
-  venue: "home" satisfies Venue,
+  venue: "home",
   pts: 20,
   reb: 10,
   ast: 8,
   source: "espn",
   sourceGameId: String(overrides.id),
   ...overrides,
+});
+
+const toExpectedPlayerGame = (row: GameLog): PlayerGame => ({
+  id: row.id,
+  gameDate: row.gameDate,
+  opponent: row.opponent,
+  venue: row.venue,
+  pts: row.pts,
+  reb: row.reb,
+  ast: row.ast,
 });
 
 type FindMany = GameLogReader["gameLog"]["findMany"];
@@ -48,7 +60,7 @@ describe("getGameLogsByPlayerId", () => {
     );
   });
 
-  it("should return findMany rows when player id is a valid integer", async () => {
+  it("should return mapped player games when player id is a valid integer", async () => {
     const playerId = 1;
     const rows: GameLog[] = [
       buildGameLog({
@@ -66,7 +78,7 @@ describe("getGameLogsByPlayerId", () => {
 
     const result = await getGameLogsByPlayerId(playerId, readerWith(findMany));
 
-    assert.deepEqual(result, rows);
+    assert.deepEqual(result, rows.map(toExpectedPlayerGame));
   });
 
   it("should return an empty array when findMany returns no rows", async () => {

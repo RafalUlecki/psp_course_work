@@ -1,15 +1,15 @@
-import type { GameLog } from "@prisma/client";
+import type { PlayerGame } from "../gameLogs/types/playerGame";
 import { isHit } from "./isHit";
 import type { ComputeHitRateResult, StatKey } from "./types/computeHitRate";
 
 const countHits = (
-  games: GameLog[],
+  games: PlayerGame[],
   line: number,
   statKey: StatKey,
 ): number => games.filter((game) => isHit(game[statKey], line)).length;
 
 export const computeHitRate = (
-  games: GameLog[],
+  games: PlayerGame[],
   line: number,
   statKey: StatKey,
 ): ComputeHitRateResult | null => {

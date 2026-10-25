@@ -1,7 +1,7 @@
-import type { Venue } from "@prisma/client";
+import type { GameVenue } from "../../gameLogs/types/playerGame";
 
 export interface FilterGamesOptions {
   lastN?: number;
   opponent?: string;
-  venue?: Venue;
+  venue?: GameVenue;
 }

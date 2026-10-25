@@ -1,31 +1,31 @@
-import type { Venue } from "@prisma/client";
+import type { GameVenue } from "../../gameLogs/types/playerGame";
 import type { StatKey } from "./computeHitRate";
 
 export interface HitRateRequest {
-  playerId: string;
+  playerId: number;
   stat: StatKey;
   line: number;
   /** Defaults to 10 when omitted. */
   lastN?: number;
   opponent?: string;
-  venue?: Venue;
+  venue?: GameVenue;
 }
 
 export interface HitRateFilters {
   lastN?: number;
   opponent?: string;
-  venue?: Venue;
+  venue?: GameVenue;
 }
 
 export interface HitRateGame {
   gameDate: string;
   opponent: string;
-  venue: Venue;
+  venue: GameVenue;
   value: number;
 }
 
 export interface HitRateSuccessResponse {
-  playerId: string;
+  playerId: number;
   stat: StatKey;
   line: number;
   filters: HitRateFilters;

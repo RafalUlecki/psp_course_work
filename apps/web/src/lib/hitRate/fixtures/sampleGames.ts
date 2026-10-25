@@ -1,4 +1,4 @@
-import type { GameLog, Venue } from "@prisma/client";
+import type { GameVenue, PlayerGame } from "../../gameLogs/types/playerGame";
 
 export const SAMPLE_HIT_RATE_PLAYER_ID = "1";
 
@@ -6,30 +6,27 @@ interface SampleGameInput {
   id: number;
   gameDate: string;
   opponent: string;
-  venue: Venue;
+  venue: GameVenue;
   pts: number;
   reb: number;
   ast: number;
 }
 
-const buildSampleGame = (input: SampleGameInput): GameLog => {
+const buildSampleGame = (input: SampleGameInput): PlayerGame => {
   const { id, gameDate, opponent, venue, pts, reb, ast } = input;
 
   return {
     id,
-    playerId: Number(SAMPLE_HIT_RATE_PLAYER_ID),
     gameDate: new Date(`${gameDate}T00:00:00.000Z`),
     opponent,
     venue,
     pts,
     reb,
     ast,
-    source: "fixture",
-    sourceGameId: String(id),
   };
 };
 
-export const sampleHitRateGames: GameLog[] = [
+export const sampleHitRateGames: PlayerGame[] = [
   buildSampleGame({
     id: 1,
     gameDate: "2026-03-18",

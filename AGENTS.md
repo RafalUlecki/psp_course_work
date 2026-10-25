@@ -5,7 +5,7 @@
 ## Stack
 
 - `apps/web` — Next.js App Router, TypeScript, Prisma → Postgres, `src/lib/` for business logic
-- `apps/extension` — Chrome MV3 stub
+- `apps/extension` — Chrome MV3 (Vite + React + styled-components + TanStack Query); load unpacked from `apps/extension/dist` after `npm run build`
 - API: thin `app/api/**/route.ts` handlers → call `src/lib` → JSON (no business logic in routes)
 - Query/body validation at the boundary: **Zod** next to the parser (e.g. `hitRate/query/`; or `schemas/` when a domain uses that layout). Keep API error strings in that module’s `errors.ts`.
 
@@ -25,13 +25,13 @@
 - `src/lib/<domain>/` per area (`gameLogs/`, `hitRate/`). Shared: `src/lib/prisma.ts`
 - Types: `src/lib/<domain>/types/<sameBaseNameAsHelper>.ts` when needed; **`interface`** for option objects
 
-### Tests (`src/**/*.test.ts`)
+### Tests (`*.test.ts`)
 
 - Names: **`should <outcome> when <condition>`**
 - **One assertion** per test; no `// Given` / `// When` / `// Then` comments
 - **No real database** in `*.test.ts` — mock ports (e.g. `GameLogReader`). DB + seed only in integration tests with `RUN_DB_TESTS=1`
 - Avoid low-value tests (duplicate `callCount`, redundant `every()` after `idsOf`, per-field seed assertions for passthrough helpers)
-- Run: `cd apps/web && npm test` (all `src/**/*.test.ts`)
+- Run: `cd apps/web && npm test` (`apps/web/src`, `apps/web/app`, and `apps/extension` `*.test.ts` files)
 
 ### Before opening a PR
 

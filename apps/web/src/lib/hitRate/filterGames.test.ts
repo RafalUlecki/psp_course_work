@@ -1,70 +1,68 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { GameLog, Venue } from "@prisma/client";
+
+import type { GameVenue, PlayerGame } from "../gameLogs/types/playerGame";
 import { filterGames } from "./filterGames";
 
-interface GameLogFixtureInput {
+interface PlayerGameFixtureInput {
   id: number;
   gameDate: Date;
   opponent?: string;
-  venue?: Venue;
+  venue?: GameVenue;
 }
 
-const buildGameLog = (input: GameLogFixtureInput): GameLog => ({
-  playerId: 1,
+const buildPlayerGame = (input: PlayerGameFixtureInput): PlayerGame => ({
+  id: input.id,
+  gameDate: input.gameDate,
   opponent: input.opponent ?? "SA",
   venue: input.venue ?? "home",
   pts: 20,
   reb: 10,
   ast: 8,
-  source: "espn",
-  sourceGameId: String(input.id),
-  id: input.id,
-  gameDate: input.gameDate,
 });
 
 const date = (isoDate: string): Date => new Date(`${isoDate}T00:00:00.000Z`);
 
-const idsOf = (games: GameLog[]): number[] => games.map((game) => game.id);
+const idsOf = (games: PlayerGame[]): number[] => games.map((game) => game.id);
 
-const unsortedGames = (): GameLog[] => [
-  buildGameLog({
+const unsortedGames = (): PlayerGame[] => [
+  buildPlayerGame({
     id: 3,
     gameDate: date("2026-04-05"),
     opponent: "SA",
     venue: "away",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 1,
     gameDate: date("2026-04-01"),
     opponent: "SA",
     venue: "home",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 7,
     gameDate: date("2026-04-13"),
     opponent: "SA",
     venue: "away",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 2,
     gameDate: date("2026-04-03"),
     opponent: "MEM",
     venue: "away",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 5,
     gameDate: date("2026-04-09"),
     opponent: "SA",
     venue: "home",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 4,
     gameDate: date("2026-04-07"),
     opponent: "MEM",
     venue: "home",
   }),
-  buildGameLog({
+  buildPlayerGame({
     id: 6,
     gameDate: date("2026-04-11"),
     opponent: "MEM",
