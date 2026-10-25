@@ -43,4 +43,4 @@ python3 -m http.server 4173 --directory apps/web/public
 # then open http://localhost:4173/fixture/props.html
 ```
 
-Reload the extension after each production build (or after watch rebuilds).
+Reload the extension after each production build (or after watch rebuilds). After `npm run seed:demo` in `apps/web` (it rewrites `players.json` and the fixture player id), rebuild the extension and reload it in Chrome.

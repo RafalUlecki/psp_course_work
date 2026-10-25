@@ -12,6 +12,7 @@ const DEFAULT_CSV_PATH = path.resolve(
 );
 const BATCH_SIZE = 100;
 const REQUIRED_COLUMNS = [
+  "player_id",
   "player_name",
   "team",
   "game_date",
@@ -28,6 +29,7 @@ type CsvColumn = (typeof REQUIRED_COLUMNS)[number];
 type CsvRecord = Record<string, string | undefined>;
 
 interface ParsedGameLog {
+  playerId: number;
   playerName: string;
   team: string | null;
   gameDate: Date;
@@ -155,6 +157,20 @@ const parseNonNegativeInt = (
   return Number(raw);
 };
 
+const parsePositiveInt = (
+  raw: string,
+  column: string,
+  rowNumber: number,
+): number => {
+  if (!/^\d+$/.test(raw) || Number(raw) <= 0) {
+    throw rowError(
+      rowNumber,
+      `"${column}" must be a positive integer, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return Number(raw);
+};
+
 const parseRequiredIntColumn = (
   record: CsvRecord,
   column: Extract<CsvColumn, "pts" | "reb" | "ast">,
@@ -217,6 +233,11 @@ const parseGameLogRow = (
   record: CsvRecord,
   rowNumber: number,
 ): ParsedGameLog => ({
+  playerId: parsePositiveInt(
+    requireString(record, "player_id", rowNumber),
+    "player_id",
+    rowNumber,
+  ),
   playerName: requireString(record, "player_name", rowNumber),
   team: requireString(record, "team", rowNumber),
   gameDate: parseIsoDate(
@@ -276,14 +297,22 @@ const chunk = <TItem>(items: TItem[], size: number): TItem[][] => {
   return batches;
 };
 
-const latestTeamByPlayer = (
-  rows: ParsedGameLog[],
-): Map<string, string | null> => {
-  const teams = new Map<string, string | null>();
+interface SeedPlayer {
+  id: number;
+  name: string;
+  team: string | null;
+}
+
+const latestPlayers = (rows: ParsedGameLog[]): SeedPlayer[] => {
+  const byId = new Map<number, SeedPlayer>();
   for (const row of rows) {
-    teams.set(row.playerName, row.team);
+    byId.set(row.playerId, {
+      id: row.playerId,
+      name: row.playerName,
+      team: row.team,
+    });
   }
-  return teams;
+  return [...byId.values()];
 };
 
 const gameLogCompositeKey = (
@@ -301,26 +330,39 @@ const gameLogMutableFields = (row: ParsedGameLog): GameLogMutableFields => ({
   ast: row.ast,
 });
 
+const upsertPlayer = async (player: SeedPlayer): Promise<void> => {
+  await prisma.$transaction(async (tx) => {
+    const existingByName = await tx.player.findUnique({
+      where: { name: player.name },
+    });
+
+    if (existingByName !== null && existingByName.id !== player.id) {
+      await tx.player.delete({ where: { id: existingByName.id } });
+    }
+
+    await tx.player.upsert({
+      where: { id: player.id },
+      create: {
+        id: player.id,
+        name: player.name,
+        team: player.team,
+      },
+      update: {
+        name: player.name,
+        team: player.team,
+      },
+    });
+  });
+};
+
 const upsertPlayers = async (
-  teamsByName: Map<string, string | null>,
+  players: SeedPlayer[],
 ): Promise<Map<string, number>> => {
-  const names = [...teamsByName.keys()];
   const idsByName = new Map<string, number>();
 
-  for (const batch of chunk(names, BATCH_SIZE)) {
-    const players = await prisma.$transaction(
-      batch.map((name) =>
-        prisma.player.upsert({
-          where: { name },
-          create: { name, team: teamsByName.get(name) },
-          update: { team: teamsByName.get(name) },
-        }),
-      ),
-    );
-
-    for (const player of players) {
-      idsByName.set(player.name, player.id);
-    }
+  for (const player of players) {
+    await upsertPlayer(player);
+    idsByName.set(player.name, player.id);
   }
 
   return idsByName;
@@ -454,7 +496,7 @@ const main = async (): Promise<void> => {
     await resetDatabase();
   }
 
-  const playerIdsByName = await upsertPlayers(latestTeamByPlayer(rows));
+  const playerIdsByName = await upsertPlayers(latestPlayers(rows));
   const { inserted, updated } = await upsertGameLogs(rows, playerIdsByName);
 
   printSeedSummary({
