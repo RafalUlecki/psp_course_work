@@ -37,3 +37,21 @@ Copy `.env.example` to `.env` before building. Do not commit `.env`. Production 
 6. Generic detector (no `data-prophover-*`): `http://localhost:3000/fixture/generic-rows.html`
 
 Reload the extension after each production build (or after watch rebuilds). After `npm run seed:demo` in `apps/web` (it rewrites `players.json` and the fixture player id), rebuild the extension and reload it in Chrome.
+
+## Playwright
+
+```bash
+# Mock API — no database (CI default)
+cd apps/extension
+npm run test:e2e
+
+# Real local API — fixture page via the background service worker
+cd apps/web
+npx prisma migrate reset --force
+npm run seed:demo
+npm run start   # or npm run dev
+cd ../extension
+VITE_HIT_RATE_API_BASE=http://localhost:3000 npm run build
+npm run test:e2e:fixture
+```
+

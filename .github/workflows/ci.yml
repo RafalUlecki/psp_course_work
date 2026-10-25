@@ -13,6 +13,22 @@ jobs:
     defaults:
       run:
         working-directory: apps/web
+    env:
+      DATABASE_URL: postgresql://prophover:prophover@localhost:5432/prophover
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: prophover
+          POSTGRES_PASSWORD: prophover
+          POSTGRES_DB: prophover
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,3 +71,24 @@ jobs:
       - name: Playwright generic rows
         working-directory: apps/extension
         run: npm run test:e2e
+
+      - name: Reset and seed database
+        run: |
+          npx prisma migrate reset --force
+          npm run seed:demo
+
+      - name: Start web
+        run: |
+          npm run start &
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:3000/fixture/props.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "web did not start on :3000"
+          exit 1
+
+      - name: Playwright fixture props
+        working-directory: apps/extension
+        run: npm run test:e2e:fixture
