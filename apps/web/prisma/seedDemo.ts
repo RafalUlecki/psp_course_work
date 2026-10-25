@@ -39,6 +39,12 @@ interface SeedDemoCliOptions {
 interface UpsertGameLogsResult {
   inserted: number;
   updated: number;
+  removedNonKaggle: number;
+}
+
+interface UpsertPlayerGameLogsProps {
+  playerId: number;
+  rows: PlayerStatisticsRow[];
 }
 
 interface WrappedThrown {
@@ -179,95 +185,113 @@ const upsertPlayers = async (players: DemoPlayer[]): Promise<void> => {
   }
 };
 
-const upsertGameLogBatch = async (
-  batch: PlayerStatisticsRow[],
+const upsertPlayerGameLogs = async (
+  props: UpsertPlayerGameLogsProps,
 ): Promise<UpsertGameLogsResult> => {
+  const { playerId, rows } = props;
+
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.gameLog.findMany({
+    const deleted = await tx.gameLog.deleteMany({
       where: {
-        OR: batch.map((row) => ({
-          playerId: row.personId,
-          source: DEMO_CSV_SOURCE,
-          sourceGameId: row.gameId,
-        })),
-      },
-      select: {
-        playerId: true,
-        source: true,
-        sourceGameId: true,
+        playerId,
+        source: { not: DEMO_CSV_SOURCE },
       },
     });
-
-    const existingKeys = new Set(
-      existing.map((row) =>
-        gameLogCompositeKey(row.playerId, row.source, row.sourceGameId),
-      ),
-    );
 
     let inserted = 0;
     let updated = 0;
 
-    for (const row of batch) {
-      const key = gameLogCompositeKey(
-        row.personId,
-        DEMO_CSV_SOURCE,
-        row.gameId,
-      );
-      if (existingKeys.has(key)) {
-        updated += 1;
-      } else {
-        inserted += 1;
-      }
-
-      const venue: Venue = row.venue === Venue.home ? Venue.home : Venue.away;
-
-      await tx.gameLog.upsert({
+    for (const batch of chunk(rows, BATCH_SIZE)) {
+      const existing = await tx.gameLog.findMany({
         where: {
-          playerId_source_sourceGameId: {
+          OR: batch.map((row) => ({
             playerId: row.personId,
             source: DEMO_CSV_SOURCE,
             sourceGameId: row.gameId,
-          },
+          })),
         },
-        create: {
-          playerId: row.personId,
-          source: DEMO_CSV_SOURCE,
-          sourceGameId: row.gameId,
-          gameDate: row.gameDate,
-          opponent: row.opponent,
-          venue,
-          pts: row.points,
-          reb: row.reboundsTotal,
-          ast: row.assists,
-        },
-        update: {
-          gameDate: row.gameDate,
-          opponent: row.opponent,
-          venue,
-          pts: row.points,
-          reb: row.reboundsTotal,
-          ast: row.assists,
+        select: {
+          playerId: true,
+          source: true,
+          sourceGameId: true,
         },
       });
+
+      const existingKeys = new Set(
+        existing.map((row) =>
+          gameLogCompositeKey(row.playerId, row.source, row.sourceGameId),
+        ),
+      );
+
+      for (const row of batch) {
+        const key = gameLogCompositeKey(
+          row.personId,
+          DEMO_CSV_SOURCE,
+          row.gameId,
+        );
+        if (existingKeys.has(key)) {
+          updated += 1;
+        } else {
+          inserted += 1;
+        }
+
+        const venue: Venue = row.venue === Venue.home ? Venue.home : Venue.away;
+
+        await tx.gameLog.upsert({
+          where: {
+            playerId_source_sourceGameId: {
+              playerId: row.personId,
+              source: DEMO_CSV_SOURCE,
+              sourceGameId: row.gameId,
+            },
+          },
+          create: {
+            playerId: row.personId,
+            source: DEMO_CSV_SOURCE,
+            sourceGameId: row.gameId,
+            gameDate: row.gameDate,
+            opponent: row.opponent,
+            venue,
+            pts: row.points,
+            reb: row.reboundsTotal,
+            ast: row.assists,
+          },
+          update: {
+            gameDate: row.gameDate,
+            opponent: row.opponent,
+            venue,
+            pts: row.points,
+            reb: row.reboundsTotal,
+            ast: row.assists,
+          },
+        });
+      }
     }
 
-    return { inserted, updated };
+    return { inserted, updated, removedNonKaggle: deleted.count };
   });
 };
 
-const upsertGameLogs = async (
-  rows: PlayerStatisticsRow[],
-): Promise<UpsertGameLogsResult> => {
+const upsertGameLogs = async (props: {
+  rows: PlayerStatisticsRow[];
+  playerIds: number[];
+}): Promise<UpsertGameLogsResult> => {
+  const { rows, playerIds } = props;
   let inserted = 0;
   let updated = 0;
+  let removedNonKaggle = 0;
 
-  for (const batch of chunk(rows, BATCH_SIZE)) {
-    const counts = await upsertGameLogBatch(batch);
+  for (const playerId of playerIds) {
+    const counts = await upsertPlayerGameLogs({
+      playerId,
+      rows: rows.filter((row) => row.personId === playerId),
+    });
     inserted += counts.inserted;
     updated += counts.updated;
+    removedNonKaggle += counts.removedNonKaggle;
   }
 
-  return { inserted, updated };
+  return { inserted, updated, removedNonKaggle };
 };
 
 const writePlayersJson = (players: DemoPlayer[]): void => {
@@ -324,14 +348,17 @@ const printSummary = (props: {
   players: DemoPlayer[];
   inserted: number;
   updated: number;
+  removedNonKaggle: number;
   jokicId: number;
 }): void => {
-  const { playerNames, players, inserted, updated, jokicId } = props;
+  const { playerNames, players, inserted, updated, removedNonKaggle, jokicId } =
+    props;
   console.log(`CSV: ${DEMO_CSV_PATH}`);
   console.log(`Players: ${playerNames.join(", ")}`);
   for (const player of players) {
     console.log(`  ${player.name} id=${player.id} team=${player.team}`);
   }
+  console.log(`Non-kaggle game logs removed: ${removedNonKaggle}`);
   console.log(`Game logs inserted: ${inserted}`);
   console.log(`Game logs updated: ${updated}`);
   console.log(`Wrote ${PLAYERS_JSON_PATH}`);
@@ -357,7 +384,10 @@ const main = async (): Promise<void> => {
   const selectedRows = rowsForPlayerIds({ rows, playerIds });
 
   await upsertPlayers(resolved.players);
-  const { inserted, updated } = await upsertGameLogs(selectedRows);
+  const { inserted, updated, removedNonKaggle } = await upsertGameLogs({
+    rows: selectedRows,
+    playerIds,
+  });
   writePlayersJson(resolved.players);
   const jokicId = fixturePlayerId(resolved.players);
   writeFixturePlayerId(jokicId);
@@ -367,6 +397,7 @@ const main = async (): Promise<void> => {
     players: resolved.players,
     inserted,
     updated,
+    removedNonKaggle,
     jokicId,
   });
 };

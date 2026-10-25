@@ -59,7 +59,7 @@ npm run db:migrate
 npm run seed:demo -- --players "Luka Doncic,Austin Reaves"
 ```
 
-It always keeps the fixture player (Nikola Jokic) and his NBA id, is idempotent, and regenerates `apps/extension/players.json` plus the fixture `data-prophover-player-id`. After re-seeding, rebuild and **reload the Chrome extension**. A name that is not in the CSV fails the command and prints that player. Source, licence, and columns: [`data/README.md`](data/README.md).
+It always keeps the fixture player (Nikola Jokic) and his NBA id, is idempotent, and regenerates `apps/extension/players.json` plus the fixture `data-prophover-player-id`. For each player it seeds, it deletes that player’s non-`kaggle` game logs so a prior `npm run seed` / `prisma migrate reset` does not mix ESPN rows under the same id. After re-seeding, rebuild and **reload the Chrome extension**. A name that is not in the CSV fails the command and prints that player. Source, licence, and columns: [`data/README.md`](data/README.md).
 
 ### ESPN sample seed
 
