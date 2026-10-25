@@ -1,6 +1,7 @@
 import {
   COMBO_HEADER_MARK,
   DECIMAL_NUMBER_PATTERN,
+  GLUED_LINE_AND_ODDS_PATTERN,
   POINTS_HEADER_MARK,
   POINTS_STAT,
   PROCESSED_ROW_ATTR,
@@ -19,13 +20,29 @@ import type {
   ProcessableElement,
 } from "./types/playerLineMatch";
 
+export const parseFirstDecimalLine = (text: string): number | null => {
+  const glued = GLUED_LINE_AND_ODDS_PATTERN.exec(text);
+
+  if (glued !== null) {
+    return Number(glued[1]);
+  }
+
+  const plain = DECIMAL_NUMBER_PATTERN.exec(text);
+
+  if (plain === null) {
+    return null;
+  }
+
+  return Number(plain[1]);
+};
+
 export const matchPlayerAndLine = (
   props: MatchPlayerAndLineProps,
 ): PlayerLineMatch | null => {
   const { text, playersByNormalizedName } = props;
   const normalized = normalizePlayerName(text);
 
-  if (DECIMAL_NUMBER_PATTERN.exec(normalized) === null) {
+  if (parseFirstDecimalLine(normalized) === null) {
     return null;
   }
 
@@ -40,16 +57,16 @@ export const matchPlayerAndLine = (
     }
 
     const afterName = normalized.slice(normalizedName.length);
-    const lineMatch = DECIMAL_NUMBER_PATTERN.exec(afterName);
+    const line = parseFirstDecimalLine(afterName);
 
-    if (lineMatch === null) {
+    if (line === null) {
       continue;
     }
 
     const candidate: PlayerLineMatch = {
       normalizedName,
       playerId,
-      line: Number(lineMatch[1]),
+      line,
     };
 
     if (

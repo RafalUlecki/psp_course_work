@@ -157,6 +157,8 @@ test("should show the Doncic card after SPA row fill and hide it on a reused non
     await doncic.hover();
     const summary = page.locator("[data-prophover-summary]");
     await expect(summary).toHaveText("PTS over 30.5 — 60% · 6/10");
+    await expect(summary).toContainText("over 30.5");
+    expect(apiRequests.some((entry) => entry.line === "30.5")).toEqual(true);
     await expect(page.locator("#betslip")).toHaveText("Kortelė(0)");
 
     await page.locator("[data-prophover-last-n='5']").hover();

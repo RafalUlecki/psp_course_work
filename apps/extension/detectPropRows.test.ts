@@ -72,6 +72,16 @@ describe("matchPlayerAndLine", () => {
     );
   });
 
+  it("should extract line 32.5 when the over line and odds are concatenated", () => {
+    assert.equal(
+      matchPlayerAndLine({
+        text: "Luka Doncic Daugiau 32.51.80Mažiau 32.51.90",
+        playersByNormalizedName,
+      })?.line,
+      32.5,
+    );
+  });
+
   it("should skip the text when the name is not in the player map", () => {
     assert.equal(
       matchPlayerAndLine({
