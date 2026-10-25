@@ -6,3 +6,5 @@ export const COMBO_HEADER_MARK = "+";
 export const DECIMAL_NUMBER_PATTERN = /(\d+\.\d+)/;
 export const FETCH_HIT_RATE_MESSAGE = "FETCH_HIT_RATE" as const;
 export const HIT_RATE_API_PATH = "/api/hit-rate";
+export const SCAN_DEBOUNCE_MS = 200;
+export const SELECTED_TAB_CLASS_PATTERN = /\b(?:selected|active)\b/i;

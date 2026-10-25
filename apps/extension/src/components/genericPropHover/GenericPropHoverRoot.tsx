@@ -11,10 +11,14 @@ import { StyleSheetManager } from "styled-components";
 
 import { HitRateCard } from "../hitRateCard/HitRateCard";
 import type { FixtureRowProps } from "../fixtureHoverRoot/types/fixtureRow";
-import { OVERLAY_HOST_ATTR } from "../../lib/genericProp/constants/genericPropConstants";
+import {
+  OVERLAY_HOST_ATTR,
+  SCAN_DEBOUNCE_MS,
+} from "../../lib/genericProp/constants/genericPropConstants";
 import {
   detectPointsPropRow,
   findSmallestPlayerLineRows,
+  findSmallestPlayerLineRowsFromChangedNode,
   markProcessed,
 } from "../../lib/genericProp/detectPropRows";
 import { loadPlayerNameMap } from "../../lib/genericProp/playerNameMap";
@@ -100,8 +104,19 @@ const GenericPropHoverRoot = (
   useEffect(() => {
     const playersByNormalizedName = loadPlayerNameMap();
 
-    const bindRow = (row: HTMLElement, fixture: FixtureRowProps): void => {
+    const bindRow = (row: HTMLElement): void => {
       row.addEventListener("mouseenter", () => {
+        const fixture = detectPointsPropRow({
+          row,
+          playersByNormalizedName,
+        });
+
+        if (fixture === null) {
+          hoveringRowRef.current = false;
+          hideCard();
+          return;
+        }
+
         showRow(row, fixture);
       });
       row.addEventListener("mouseleave", () => {
@@ -110,43 +125,98 @@ const GenericPropHoverRoot = (
       });
     };
 
+    const bindRows = (rows: HTMLElement[]): void => {
+      for (const row of rows) {
+        markProcessed(row);
+        bindRow(row);
+      }
+    };
+
     const scanRoot = (root: ParentNode): void => {
       if (root instanceof Node && overlayHost.contains(root)) {
         return;
       }
 
-      for (const row of findSmallestPlayerLineRows({
-        root,
-        playersByNormalizedName,
-      })) {
-        markProcessed(row);
-        const fixture = detectPointsPropRow({
-          row,
+      bindRows(
+        findSmallestPlayerLineRows({
+          root,
           playersByNormalizedName,
-        });
-
-        if (fixture !== null) {
-          bindRow(row, fixture);
-        }
-      }
+        }),
+      );
     };
 
     scanRoot(document.body);
 
+    const pendingNodes = new Set<Node>();
+    let debounceTimer = 0;
+
+    const flushChangedNodes = (): void => {
+      const nodes = [...pendingNodes];
+      pendingNodes.clear();
+
+      for (const node of nodes) {
+        bindRows(
+          findSmallestPlayerLineRowsFromChangedNode({
+            node,
+            overlayHost,
+            playersByNormalizedName,
+          }),
+        );
+      }
+    };
+
+    const scheduleScan = (node: Node): void => {
+      if (overlayHost.contains(node)) {
+        return;
+      }
+
+      pendingNodes.add(node);
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(flushChangedNodes, SCAN_DEBOUNCE_MS);
+    };
+
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
+        if (overlayHost.contains(mutation.target)) {
+          continue;
+        }
+
+        if (mutation.type === "characterData") {
+          scheduleScan(mutation.target);
+          continue;
+        }
+
+        if (mutation.type === "attributes") {
+          scheduleScan(mutation.target);
+          continue;
+        }
+
         for (const node of mutation.addedNodes) {
-          if (node instanceof Element && !overlayHost.contains(node)) {
-            scanRoot(node);
-          }
+          scheduleScan(node);
+        }
+
+        if (mutation.addedNodes.length > 0) {
+          scheduleScan(mutation.target);
         }
       }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: [
+        "aria-selected",
+        "aria-current",
+        "aria-pressed",
+        "class",
+      ],
+    });
 
     return () => {
       observer.disconnect();
+      window.clearTimeout(debounceTimer);
       cancelHide();
     };
   }, [overlayHost, showRow, hideCard, cancelHide]);

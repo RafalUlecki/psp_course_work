@@ -24,6 +24,14 @@ export interface FindNearestPrecedingHeaderTextProps {
   playersByNormalizedName: Map<string, number>;
 }
 
+export type FindMarketContextTextProps = FindNearestPrecedingHeaderTextProps;
+
+export interface FindSmallestPlayerLineRowsFromChangedNodeProps {
+  node: Node;
+  overlayHost: Element;
+  playersByNormalizedName: Map<string, number>;
+}
+
 export interface DetectPointsPropRowProps {
   row: HTMLElement;
   playersByNormalizedName: Map<string, number>;

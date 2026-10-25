@@ -68,7 +68,7 @@ jobs:
         working-directory: apps/extension
         run: npx playwright install chromium --with-deps
 
-      - name: Playwright generic rows
+      - name: Playwright generic rows and tabs
         working-directory: apps/extension
         run: npm run test:e2e
 

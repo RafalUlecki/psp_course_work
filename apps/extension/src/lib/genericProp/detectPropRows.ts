@@ -4,12 +4,15 @@ import {
   POINTS_HEADER_MARK,
   POINTS_STAT,
   PROCESSED_ROW_ATTR,
+  SELECTED_TAB_CLASS_PATTERN,
 } from "./constants/genericPropConstants";
 import { normalizePlayerName } from "./playerNameMap";
 import type { FixtureRowProps } from "../../components/fixtureHoverRoot/types/fixtureRow";
 import type {
   DetectPointsPropRowProps,
+  FindMarketContextTextProps,
   FindNearestPrecedingHeaderTextProps,
+  FindSmallestPlayerLineRowsFromChangedNodeProps,
   FindSmallestPlayerLineRowsProps,
   MatchPlayerAndLineProps,
   PlayerLineMatch,
@@ -138,6 +141,56 @@ export const findSmallestPlayerLineRows = (
   return rows;
 };
 
+export const findSmallestPlayerLineRowsFromChangedNode = (
+  props: FindSmallestPlayerLineRowsFromChangedNodeProps,
+): HTMLElement[] => {
+  const { node, overlayHost, playersByNormalizedName } = props;
+
+  if (overlayHost.contains(node)) {
+    return [];
+  }
+
+  const start: Element | null = isElement(node) ? node : node.parentElement;
+
+  if (start === null || overlayHost.contains(start)) {
+    return [];
+  }
+
+  const rowsByNode = new Set<HTMLElement>();
+  const addRowsFrom = (root: ParentNode): void => {
+    for (const row of findSmallestPlayerLineRows({
+      root,
+      playersByNormalizedName,
+    })) {
+      rowsByNode.add(row);
+    }
+  };
+
+  addRowsFrom(start);
+
+  let ancestor: Element | null = start.parentElement;
+
+  while (ancestor !== null && !overlayHost.contains(ancestor)) {
+    if (isProcessed(ancestor)) {
+      break;
+    }
+
+    if (
+      matchPlayerAndLine({
+        text: ancestor.textContent ?? "",
+        playersByNormalizedName,
+      }) !== null
+    ) {
+      addRowsFrom(ancestor);
+      break;
+    }
+
+    ancestor = ancestor.parentElement;
+  }
+
+  return [...rowsByNode];
+};
+
 const elementMatchesPlayerLine = (
   element: Element,
   playersByNormalizedName: Map<string, number>,
@@ -146,6 +199,132 @@ const elementMatchesPlayerLine = (
     text: element.textContent ?? "",
     playersByNormalizedName,
   }) !== null;
+
+const hasTruthyAriaState = (element: Element, name: string): boolean => {
+  const value = element.getAttribute(name);
+
+  return value !== null && value !== "false";
+};
+
+const hasTabLikeSibling = (element: Element): boolean => {
+  const parent = element.parentElement;
+
+  if (parent === null) {
+    return false;
+  }
+
+  for (const sibling of parent.children) {
+    if (sibling === element) {
+      continue;
+    }
+
+    if (sibling.getAttribute("role") === "tab") {
+      return true;
+    }
+
+    if (sibling.hasAttribute("aria-selected")) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const isTabLike = (element: Element): boolean => {
+  if (element.getAttribute("role") === "tab") {
+    return true;
+  }
+
+  if (element.closest('[role="tablist"]') !== null) {
+    return true;
+  }
+
+  return hasTabLikeSibling(element);
+};
+
+const isSelectedTabLike = (element: Element): boolean => {
+  if (!isTabLike(element)) {
+    return false;
+  }
+
+  if (element.getAttribute("aria-selected") === "true") {
+    return true;
+  }
+
+  if (hasTruthyAriaState(element, "aria-current")) {
+    return true;
+  }
+
+  if (element.getAttribute("aria-pressed") === "true") {
+    return true;
+  }
+
+  return SELECTED_TAB_CLASS_PATTERN.test(element.getAttribute("class") ?? "");
+};
+
+const isTabContextNode = (element: Element): boolean => {
+  if (element.getAttribute("role") === "tablist") {
+    return true;
+  }
+
+  if (element.getAttribute("role") === "tab") {
+    return true;
+  }
+
+  return element.querySelector('[role="tab"], [role="tablist"]') !== null;
+};
+
+const selectedTabLabelIn = (root: Element): string | null => {
+  const candidates = [root, ...root.querySelectorAll("*")];
+
+  for (const element of candidates) {
+    if (!isSelectedTabLike(element)) {
+      continue;
+    }
+
+    const text = element.textContent ?? "";
+
+    if (text.trim().length > 0) {
+      return text;
+    }
+  }
+
+  return null;
+};
+
+const collectSelectedTabFromNode = (node: Node | null): string | null => {
+  let current = node;
+
+  while (current !== null) {
+    if (isElement(current)) {
+      const label = selectedTabLabelIn(current);
+
+      if (label !== null) {
+        return label;
+      }
+    }
+
+    current = current.previousSibling;
+  }
+
+  return null;
+};
+
+export const findNearestSelectedTabLabel = (row: Element): string => {
+  let current: Element | null = row;
+
+  while (current !== null) {
+    const found = collectSelectedTabFromNode(current.previousSibling);
+
+    if (found !== null) {
+      return found;
+    }
+
+    current = current.parentElement;
+  }
+
+  return "";
+};
 
 const collectHeaderFromNode = (
   node: Node | null,
@@ -161,6 +340,11 @@ const collectHeaderFromNode = (
         return text;
       }
     } else if (isElement(current)) {
+      if (isTabContextNode(current)) {
+        current = current.previousSibling;
+        continue;
+      }
+
       if (!elementMatchesPlayerLine(current, playersByNormalizedName)) {
         const nested = collectHeaderFromNode(
           current.lastChild,
@@ -207,6 +391,28 @@ export const findNearestPrecedingHeaderText = (
   return "";
 };
 
+export const findMarketContextText = (
+  props: FindMarketContextTextProps,
+): string => {
+  const { row, playersByNormalizedName } = props;
+  const headerText = findNearestPrecedingHeaderText({
+    row,
+    playersByNormalizedName,
+  });
+
+  if (isPointsMarketHeader(headerText)) {
+    return headerText;
+  }
+
+  const tabLabel = findNearestSelectedTabLabel(row);
+
+  if (tabLabel.length > 0) {
+    return tabLabel;
+  }
+
+  return headerText;
+};
+
 const displayNameFromRow = (row: HTMLElement): string => {
   for (const line of (row.textContent ?? "").split("\n")) {
     const trimmed = line.trim();
@@ -232,12 +438,12 @@ export const detectPointsPropRow = (
     return null;
   }
 
-  const headerText = findNearestPrecedingHeaderText({
+  const marketText = findMarketContextText({
     row,
     playersByNormalizedName,
   });
 
-  if (!isPointsMarketHeader(headerText)) {
+  if (!isPointsMarketHeader(marketText)) {
     return null;
   }
 
