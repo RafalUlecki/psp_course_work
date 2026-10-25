@@ -1,17 +1,17 @@
-import type { GameLog } from "@prisma/client";
+import type { PlayerGame } from "../gameLogs/types/playerGame";
 import type { FilterGamesOptions } from "./types/filterGames";
 
-interface GameLogFilters {
+interface GameFilters {
   opponent?: string;
   venue?: FilterGamesOptions["venue"];
 }
 
-const sortByGameDateNewestFirst = (games: GameLog[]): GameLog[] =>
+const sortByGameDateNewestFirst = (games: PlayerGame[]): PlayerGame[] =>
   [...games].sort(
     (left, right) => right.gameDate.getTime() - left.gameDate.getTime(),
   );
 
-const matchesFilters = (game: GameLog, filters: GameLogFilters): boolean => {
+const matchesFilters = (game: PlayerGame, filters: GameFilters): boolean => {
   const { opponent, venue } = filters;
 
   if (opponent !== undefined && game.opponent !== opponent) {
@@ -24,7 +24,10 @@ const matchesFilters = (game: GameLog, filters: GameLogFilters): boolean => {
   return true;
 };
 
-const applyLastN = (games: GameLog[], lastN: number | undefined): GameLog[] => {
+const applyLastN = (
+  games: PlayerGame[],
+  lastN: number | undefined,
+): PlayerGame[] => {
   if (lastN === undefined) {
     return games;
   }
@@ -33,9 +36,9 @@ const applyLastN = (games: GameLog[], lastN: number | undefined): GameLog[] => {
 };
 
 export const filterGames = (
-  games: GameLog[],
+  games: PlayerGame[],
   options: FilterGamesOptions = {},
-): GameLog[] => {
+): PlayerGame[] => {
   const { lastN, opponent, venue } = options;
 
   const filtered = sortByGameDateNewestFirst(games).filter((game) =>

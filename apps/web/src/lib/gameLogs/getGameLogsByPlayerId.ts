@@ -1,8 +1,9 @@
+import { prisma } from "../prisma";
+import { toPlayerGame } from "./toPlayerGame";
 import type {
   GameLogReader,
   PlayerGameLogs,
 } from "./types/getGameLogsByPlayerId";
-import { prisma } from "../prisma";
 
 export const getGameLogsByPlayerId = async (
   playerId: number,
@@ -12,8 +13,10 @@ export const getGameLogsByPlayerId = async (
     return [];
   }
 
-  return db.gameLog.findMany({
+  const rows = await db.gameLog.findMany({
     where: { playerId },
     orderBy: { gameDate: "desc" },
   });
+
+  return rows.map(toPlayerGame);
 };

@@ -21,11 +21,14 @@ const collectTestFiles = (dir) => {
   return files;
 };
 
-const testRoots = ["src", "app"].map((segment) => join(webRoot, segment));
+const extensionRoot = join(webRoot, "..", "extension");
+const testRoots = [join(webRoot, "src"), join(webRoot, "app"), extensionRoot];
 const testFiles = testRoots.flatMap(collectTestFiles);
 
 if (testFiles.length === 0) {
-  console.error("No *.test.ts files found under src/ or app/");
+  console.error(
+    "No *.test.ts files found under src/, app/, or apps/extension/",
+  );
   process.exit(1);
 }
 

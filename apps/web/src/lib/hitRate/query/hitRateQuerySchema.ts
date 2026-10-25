@@ -1,4 +1,3 @@
-import { Venue } from "@prisma/client";
 import { z } from "zod";
 import {
   INVALID_LAST_N_ERROR,
@@ -33,14 +32,15 @@ const lastNSearchParamSchema = z.optional(
 );
 
 const venueSearchParamSchema = z
-  .enum([Venue.home, Venue.away], { error: INVALID_VENUE_ERROR })
+  .enum(["home", "away"], { error: INVALID_VENUE_ERROR })
   .optional();
 
 const playerIdSearchParamSchema = z
   .string({ error: MISSING_PLAYER_ID_ERROR })
   .refine((value) => Number.isInteger(Number(value)), {
     message: INVALID_PLAYER_ID_ERROR,
-  });
+  })
+  .transform((value) => Number(value));
 
 const hitRateQueryObjectSchema = z.object({
   playerId: playerIdSearchParamSchema,

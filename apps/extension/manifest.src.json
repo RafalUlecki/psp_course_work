@@ -2,10 +2,7 @@
   "manifest_version": 3,
   "name": "PropHover",
   "version": "0.1.0",
-  "description": "PropHover Chrome extension stub.",
-  "background": {
-    "service_worker": "background.js"
-  },
+  "description": "PropHover Chrome extension (fixture hover card).",
   "content_scripts": [
     {
       "matches": ["http://localhost:3000/fixture/*"],
