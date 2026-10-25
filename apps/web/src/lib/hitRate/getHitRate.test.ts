@@ -50,8 +50,7 @@ const emptyShape = {
   games: [],
 };
 
-const loadFixtureGames = async (_playerId: number): Promise<PlayerGame[]> =>
-  sampleHitRateGames;
+const loadFixtureGames = async (): Promise<PlayerGame[]> => sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
