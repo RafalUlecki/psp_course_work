@@ -161,7 +161,12 @@ describe("getHitRate", () => {
   });
 
   it("should call the loader with the playerId when playerId is provided", async () => {
-    const loadGameLogs = mock.fn(loadFixtureGames);
+    const loadGameLogs = mock.fn(
+      async (playerId: number): Promise<PlayerGame[]> =>
+        playerId === Number(SAMPLE_HIT_RATE_PLAYER_ID)
+          ? sampleHitRateGames
+          : [],
+    );
 
     await getHitRate(
       { searchParams: toSearchParams(requiredQuery) },
