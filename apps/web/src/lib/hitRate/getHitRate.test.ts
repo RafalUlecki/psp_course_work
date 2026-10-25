@@ -20,6 +20,7 @@ import {
   MISSING_LINE_ERROR,
   MISSING_PLAYER_ID_ERROR,
 } from "./query/errors";
+import type { GameLogLoader } from "./types/getHitRate";
 
 type HitRateQuery = Partial<Record<HitRateQueryParamName, string>>;
 
@@ -50,7 +51,7 @@ const emptyShape = {
   games: [],
 };
 
-const loadFixtureGames = async (): Promise<PlayerGame[]> => sampleHitRateGames;
+const loadFixtureGames: GameLogLoader = async () => sampleHitRateGames;
 
 const getHitRateForTests = (query: HitRateQuery) =>
   getHitRate({ searchParams: toSearchParams(query) }, loadFixtureGames);
