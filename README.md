@@ -6,6 +6,16 @@
 
 Postgres schema and migrations live in `apps/web/prisma/`. See [apps/web/README.md](apps/web/README.md#database-prisma--postgres) for how to run migrations against local Postgres.
 
+Demo seed (2025–26 box scores, NBA `personId` as `players.id`):
+
+```bash
+cd apps/web
+npm run db:migrate
+npm run seed:demo -- --players "Luka Doncic,Austin Reaves"
+```
+
+That command reads only the committed CSV (no network). Re-run it the day before a demo, then **rebuild and reload the Chrome extension** so `apps/extension/players.json` stays in sync. Source and licence: [apps/web/data/README.md](apps/web/data/README.md).
+
 ## `apps/web` structure
 
 Each **page** or **app shell feature** lives in a private folder under `app/` (prefix `_` so it is not a URL segment). Inside the feature:
