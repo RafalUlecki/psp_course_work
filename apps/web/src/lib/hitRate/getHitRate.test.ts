@@ -67,6 +67,15 @@ const emptyResultShape = (result: Awaited<ReturnType<typeof getHitRate>>) =>
       }
     : null;
 
+const hitRateStats = (result: Awaited<ReturnType<typeof getHitRate>>) =>
+  result.status === 200
+    ? {
+        hitRate: result.body.hitRate,
+        hits: result.body.hits,
+        n: result.body.n,
+      }
+    : null;
+
 describe("getHitRate", () => {
   it("should return hitRate 0.7 when fixture player PTS lastN 10 and line 24.5 are used", async () => {
     const result = await getHitRateForTests({ ...requiredQuery, lastN: "10" });
@@ -116,6 +125,39 @@ describe("getHitRate", () => {
     const result = await getHitRateForTests({
       ...requiredQuery,
       opponent: "ZZZ",
+    });
+
+    assert.deepEqual(emptyResultShape(result), emptyShape);
+  });
+
+  // Combined filters: opponent/venue first, then lastN (see filterGames).
+  it("should return hitRate 1, hits 2, and n 2 when lastN is 3 and opponent is UTAH", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "3",
+      opponent: "UTAH",
+    });
+
+    assert.deepEqual(hitRateStats(result), { hitRate: 1, hits: 2, n: 2 });
+  });
+
+  it("should return hitRate 1, hits 1, and n 1 when lastN is 3 opponent is UTAH and venue is home", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "3",
+      opponent: "UTAH",
+      venue: "home",
+    });
+
+    assert.deepEqual(hitRateStats(result), { hitRate: 1, hits: 1, n: 1 });
+  });
+
+  it("should return the empty shape when lastN is 5 opponent is MEM and venue is home", async () => {
+    const result = await getHitRateForTests({
+      ...requiredQuery,
+      lastN: "5",
+      opponent: "MEM",
+      venue: "home",
     });
 
     assert.deepEqual(emptyResultShape(result), emptyShape);

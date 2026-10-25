@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { GameVenue, PlayerGame } from "../gameLogs/types/playerGame";
+import { sampleHitRateGames } from "./fixtures/sampleGames";
 import { filterGames } from "./filterGames";
 
 interface PlayerGameFixtureInput {
@@ -101,6 +102,8 @@ describe("filterGames", () => {
     assert.deepEqual(idsOf(result), [5, 4, 1]);
   });
 
+  // Combined filters: newest-first, then opponent/venue, then lastN.
+  // lastN on the full timeline first would drop older matching games.
   it("should apply lastN after opponent and venue filters", () => {
     const games = unsortedGames();
 
@@ -111,6 +114,26 @@ describe("filterGames", () => {
     });
 
     assert.deepEqual(idsOf(result), [5, 1]);
+  });
+
+  it("should keep the UTAH home game when lastN is 3 opponent is UTAH and venue is home", () => {
+    const result = filterGames(sampleHitRateGames, {
+      lastN: 3,
+      opponent: "UTAH",
+      venue: "home",
+    });
+
+    assert.deepEqual(idsOf(result), [6]);
+  });
+
+  it("should return an empty array when lastN opponent and venue match no games", () => {
+    const result = filterGames(sampleHitRateGames, {
+      lastN: 5,
+      opponent: "MEM",
+      venue: "home",
+    });
+
+    assert.deepEqual(idsOf(result), []);
   });
 
   it("should return all filtered games when lastN is larger than the filtered list", () => {
