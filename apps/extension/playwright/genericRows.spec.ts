@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, expect, test, type BrowserContext, type Page } from "@playwright/test";
@@ -86,7 +87,7 @@ test("should show the Doncic hit-rate card and ignore other rows on the generic 
       response.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Security-Policy":
-          "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'",
+          "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'",
       });
       response.end(pageHtml);
       return;
@@ -97,6 +98,7 @@ test("should show the Doncic hit-rate card and ignore other rows on the generic 
   });
 
   let context: BrowserContext | undefined;
+  const userDataDir = mkdtempSync(join(tmpdir(), "prophover-ext-"));
 
   try {
     await listen(apiServer, 3000);
@@ -104,17 +106,24 @@ test("should show the Doncic hit-rate card and ignore other rows on the generic 
     const address = pageServer.address();
     const pagePort =
       address !== null && typeof address !== "string" ? address.port : 4173;
+    const extensionPath = join(extensionRoot, "dist");
 
-    context = await chromium.launchPersistentContext("", {
-      headless: true,
+    context = await chromium.launchPersistentContext(userDataDir, {
+      headless: false,
       args: [
         "--headless=new",
-        `--disable-extensions-except=${join(extensionRoot, "dist")}`,
-        `--load-extension=${join(extensionRoot, "dist")}`,
+        "--disable-gpu",
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
       ],
+      ignoreDefaultArgs: ["--disable-extensions"],
     });
 
-    const page: Page = await context.newPage();
+    if (context.serviceWorkers().length === 0) {
+      await context.waitForEvent("serviceworker", { timeout: 15_000 });
+    }
+
+    const page: Page = context.pages()[0] ?? (await context.newPage());
     page.on("console", (message) => {
       if (message.type() === "error") {
         consoleErrors.push(message.text());
@@ -163,6 +172,7 @@ test("should show the Doncic hit-rate card and ignore other rows on the generic 
     expect(consoleErrors).toEqual([]);
   } finally {
     await context?.close();
+    rmSync(userDataDir, { recursive: true, force: true });
     await closeServer(pageServer);
     await closeServer(apiServer);
   }
