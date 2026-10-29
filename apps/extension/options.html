@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PropHover settings</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        color: hsl(240 10% 3.9%);
+        background: hsl(0 0% 100%);
+      }
+
+      main {
+        max-width: 22rem;
+      }
+
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.125rem;
+      }
+
+      p {
+        margin: 0 0 1rem;
+        color: hsl(240 3.8% 46.1%);
+        font-size: 0.875rem;
+      }
+
+      fieldset {
+        margin: 0;
+        padding: 0.75rem 1rem;
+        border: 1px solid hsl(240 5.9% 90%);
+        border-radius: 0.5rem;
+      }
+
+      legend {
+        padding: 0 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+
+      label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PropHover</h1>
+      <p>Choose which test client owns the hover-card watchlist.</p>
+      <fieldset>
+        <legend>Client</legend>
+        <label>
+          <input type="radio" name="clientId" value="A" />
+          Client A
+        </label>
+        <label>
+          <input type="radio" name="clientId" value="B" />
+          Client B
+        </label>
+      </fieldset>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

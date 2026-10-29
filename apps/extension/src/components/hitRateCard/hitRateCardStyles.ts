@@ -60,6 +60,13 @@ interface SummaryProps {
   $viewStatus: string;
 }
 
+export const SummaryRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+`;
+
 export const Summary = styled.div<SummaryProps>`
   white-space: nowrap;
   font-size: 0.875rem;
@@ -69,6 +76,37 @@ export const Summary = styled.div<SummaryProps>`
     props.$viewStatus === "error"
       ? shadcnTheme.destructive
       : shadcnTheme.cardForeground};
+`;
+
+interface StarButtonProps {
+  $watched: boolean;
+}
+
+export const StarButton = styled.button<StarButtonProps>`
+  border: none;
+  background: transparent;
+  padding: 0.125rem;
+  margin: 0;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: ${(props) =>
+    props.$watched ? "hsl(45 93% 47%)" : shadcnTheme.mutedForeground};
+
+  &:hover:not(:disabled) {
+    color: ${(props) =>
+      props.$watched ? "hsl(45 93% 40%)" : shadcnTheme.foreground};
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${shadcnTheme.ring};
+    outline-offset: 2px;
+  }
 `;
 
 export const ToggleRow = styled.div`
