@@ -6,15 +6,17 @@ import {
   HIT_RATE_CARD_LOADING_TEXT,
   HIT_RATE_LAST_N_OPTIONS,
   HIT_RATE_LINE_DEBOUNCE_MS,
-  HIT_RATE_LINE_MIN,
-  HIT_RATE_LINE_RANGE,
-  HIT_RATE_LINE_STEP,
   HIT_RATE_VENUE_FILTER_OPTIONS,
   HitRateLastN,
   HitRateVenueFilter,
 } from "./constants/hitRateCardConstants";
 import { useHitRateQuery } from "./requests/useHitRateQuery";
 import type { HitRateCardProps } from "./types/hitRateCard";
+import {
+  alignLineToStep,
+  formatLineValue,
+  resolveLineSliderBounds,
+} from "./utils/resolveLineSliderBounds";
 import { resolveHitRateCardSummary } from "./utils/resolveHitRateCardSummary";
 import { useDebouncedValue } from "./utils/useDebouncedValue";
 import {
@@ -40,7 +42,7 @@ const stop = (event: SyntheticEvent): void => {
 
 export const HitRateCard = (props: HitRateCardProps): ReactElement => {
   const {
-    fixture,
+    prop,
     anchorTop,
     anchorLeft,
     onLineSliderActiveChange,
@@ -48,16 +50,16 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
     rowElement,
   } = props;
 
-  const { playerId, stat, fixtureLine, opponentCodes } = fixture;
-  const lineMin = Math.max(HIT_RATE_LINE_MIN, fixtureLine - HIT_RATE_LINE_RANGE);
-  const lineMax = fixtureLine + HIT_RATE_LINE_RANGE;
+  const { playerId, stat, line: propLine, opponentCodes } = prop;
+  const lineSlider = resolveLineSliderBounds({ fixtureLine: propLine });
+  const { min: lineMin, max: lineMax, step: lineStep } = lineSlider;
 
   const form = useForm({
     defaultValues: {
       lastN: HitRateLastN.Ten,
       opponent: HitRateVenueFilter.All as string,
       venue: HitRateVenueFilter.All as string,
-      line: fixtureLine,
+      line: propLine,
     },
   });
 
@@ -118,7 +120,14 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
   return (
     <CardAnchor style={{ top: anchorTop, left: anchorLeft }}>
       <HitRateCardGlobalStyle />
-      <Panel data-prophover-card="">
+      <Panel
+        data-prophover-card=""
+        onClick={stop}
+        onMouseDown={stop}
+        onMouseUp={stop}
+        onPointerDown={stop}
+        onPointerUp={stop}
+      >
         <Summary
           data-prophover-summary=""
           data-prophover-state={viewStatus}
@@ -153,7 +162,7 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
                 data-prophover-line-slider=""
                 min={lineMin}
                 max={lineMax}
-                step={HIT_RATE_LINE_STEP}
+                step={lineStep}
                 value={field.state.value}
                 onPointerDown={(event) => {
                   stop(event);
@@ -170,7 +179,12 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
                 }}
                 onInput={(event) => {
                   stop(event);
-                  field.handleChange(Number(event.currentTarget.value));
+                  field.handleChange(
+                    alignLineToStep(
+                      Number(event.currentTarget.value),
+                      lineStep,
+                    ),
+                  );
                 }}
                 onClick={stop}
                 onMouseDown={stop}
@@ -181,7 +195,7 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
                 onTouchMove={stop}
               />
               <LineValue data-prophover-line-value="">
-                {field.state.value}
+                {formatLineValue(field.state.value)}
               </LineValue>
             </LineControl>
           )}

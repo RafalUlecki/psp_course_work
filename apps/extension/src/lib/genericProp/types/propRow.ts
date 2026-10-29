@@ -1,7 +1,7 @@
-export interface FixtureRowProps {
+export interface PropRow {
   player: string;
   playerId: string;
   stat: string;
-  fixtureLine: number;
+  line: number;
   opponentCodes: string[];
 }

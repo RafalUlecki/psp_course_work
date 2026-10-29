@@ -4,10 +4,6 @@ import {
   collectMissingPlayerNames,
   resolvePlayerId,
 } from "../players/playerNameMap";
-import {
-  DEFAULT_DEMO_PLAYER_NAMES,
-  FIXTURE_PLAYER_NAME,
-} from "./constants/demoSeedConstants";
 import type { DemoPlayer } from "./types/demoPlayer";
 import type { PlayerStatisticsRow } from "./types/playerStatisticsRow";
 
@@ -32,22 +28,6 @@ export const parsePlayerNameList = (raw: string): string[] => {
 
   return names;
 };
-
-export const withFixturePlayer = (names: readonly string[]): string[] => {
-  const fixtureKey = normalizePlayerName(FIXTURE_PLAYER_NAME);
-  const hasFixture = names.some(
-    (name) => normalizePlayerName(name) === fixtureKey,
-  );
-
-  if (hasFixture) {
-    return [...names];
-  }
-
-  return [FIXTURE_PLAYER_NAME, ...names];
-};
-
-export const defaultDemoPlayerNames = (): string[] =>
-  withFixturePlayer(DEFAULT_DEMO_PLAYER_NAMES);
 
 export const latestPlayersFromRows = (
   rows: readonly PlayerStatisticsRow[],

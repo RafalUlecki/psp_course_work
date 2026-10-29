@@ -1,10 +1,10 @@
-import type { FixtureRowProps } from "../../fixtureHoverRoot/types/fixtureRow";
+import type { PropRow } from "../../../lib/genericProp/types/propRow";
 
 export interface HitRateCardProps {
-  fixture: FixtureRowProps;
+  prop: PropRow;
   anchorTop: number;
   anchorLeft: number;
+  rowElement: HTMLElement;
   onLineSliderActiveChange: (active: boolean) => void;
   onRequestHide: () => void;
-  rowElement: HTMLElement;
 }

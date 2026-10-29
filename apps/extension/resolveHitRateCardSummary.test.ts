@@ -31,4 +31,13 @@ describe("resolveHitRateCardSummary", () => {
       "PTS over 24.5 — 40% · 4/10",
     );
   });
+
+  it("should return PTS over 32.5 when the parsed line is 32.5", () => {
+    assert.equal(
+      resolveHitRateCardSummary(
+        sampleResult({ line: 32.5, hitRate: 0.7, hits: 7, n: 10 }),
+      ),
+      "PTS over 32.5 — 70% · 7/10",
+    );
+  });
 });

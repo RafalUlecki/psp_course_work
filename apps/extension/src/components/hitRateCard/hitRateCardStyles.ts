@@ -30,6 +30,7 @@ export const HitRateCardGlobalStyle = createGlobalStyle`
 export const CardAnchor = styled.div`
   position: fixed;
   z-index: 2147483647;
+  pointer-events: auto;
   padding-top: 0.5rem;
   font-family: ${shadcnTheme.fontSans};
   font-size: 0.875rem;

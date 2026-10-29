@@ -2,14 +2,17 @@
   "manifest_version": 3,
   "name": "PropHover",
   "version": "0.1.0",
-  "description": "PropHover Chrome extension (fixture hover card).",
+  "description": "PropHover Chrome extension for betsson.lt player points props.",
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "http://localhost:3000/*",
     "https://YOUR_HOSTED_API_ORIGIN.example/*"
   ],
   "content_scripts": [
     {
-      "matches": ["http://localhost/fixture/*"],
+      "matches": ["https://www.betsson.lt/*"],
       "js": ["content.js"]
     }
   ]

@@ -1,3 +1,5 @@
+import { formatLineValue } from "./resolveLineSliderBounds";
+
 export interface HitRateCardResult {
   stat: string;
   line: number;
@@ -7,12 +9,14 @@ export interface HitRateCardResult {
 }
 
 export const resolveHitRateCardSummary = (result: HitRateCardResult): string => {
+  const lineText = formatLineValue(result.line);
+
   if (result.n === 0) {
-    return `${result.stat} over ${result.line} — Not enough data`;
+    return `${result.stat} over ${lineText} — Not enough data`;
   }
 
   const percent =
     result.hitRate === null ? "—" : `${Math.round(result.hitRate * 100)}%`;
 
-  return `${result.stat} over ${result.line} — ${percent} · ${result.hits}/${result.n}`;
+  return `${result.stat} over ${lineText} — ${percent} · ${result.hits}/${result.n}`;
 };

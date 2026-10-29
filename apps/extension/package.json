@@ -18,10 +18,13 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.323",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.7.0",
+    "esbuild": "^0.25.12",
+    "jsdom": "^27.4.0",
     "typescript": "^5",
     "vite": "^6.4.1"
   }
