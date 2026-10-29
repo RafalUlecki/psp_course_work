@@ -2,18 +2,19 @@ import {
   COMBO_HEADER_MARK,
   DECIMAL_NUMBER_PATTERN,
   GLUED_LINE_AND_ODDS_PATTERN,
+  MARKET_HEADER_MARKS,
+  MARKET_HEADER_MAX_LENGTH,
   POINTS_HEADER_MARK,
   POINTS_STAT,
   PROCESSED_ROW_ATTR,
   SELECTED_TAB_CLASS_PATTERN,
 } from "./constants/genericPropConstants";
 import { normalizePlayerName } from "./playerNameMap";
-import type { FixtureRowProps } from "../../components/fixtureHoverRoot/types/fixtureRow";
+import type { PropRow } from "./types/propRow";
 import type {
   DetectPointsPropRowProps,
   FindMarketContextTextProps,
   FindNearestPrecedingHeaderTextProps,
-  FindSmallestPlayerLineRowsFromChangedNodeProps,
   FindSmallestPlayerLineRowsProps,
   MatchPlayerAndLineProps,
   PlayerLineMatch,
@@ -84,6 +85,18 @@ export const isPointsMarketHeader = (headerText: string): boolean => {
   const lower = headerText.toLowerCase();
 
   return lower.includes(POINTS_HEADER_MARK) && !lower.includes(COMBO_HEADER_MARK);
+};
+
+const isMarketLikeHeader = (headerText: string): boolean => {
+  const trimmed = headerText.trim();
+
+  if (trimmed.length === 0 || trimmed.length > MARKET_HEADER_MAX_LENGTH) {
+    return false;
+  }
+
+  const lower = trimmed.toLowerCase();
+
+  return MARKET_HEADER_MARKS.some((mark) => lower.includes(mark));
 };
 
 export const markProcessed = (row: ProcessableElement): void => {
@@ -158,56 +171,6 @@ export const findSmallestPlayerLineRows = (
   return rows;
 };
 
-export const findSmallestPlayerLineRowsFromChangedNode = (
-  props: FindSmallestPlayerLineRowsFromChangedNodeProps,
-): HTMLElement[] => {
-  const { node, overlayHost, playersByNormalizedName } = props;
-
-  if (overlayHost.contains(node)) {
-    return [];
-  }
-
-  const start: Element | null = isElement(node) ? node : node.parentElement;
-
-  if (start === null || overlayHost.contains(start)) {
-    return [];
-  }
-
-  const rowsByNode = new Set<HTMLElement>();
-  const addRowsFrom = (root: ParentNode): void => {
-    for (const row of findSmallestPlayerLineRows({
-      root,
-      playersByNormalizedName,
-    })) {
-      rowsByNode.add(row);
-    }
-  };
-
-  addRowsFrom(start);
-
-  let ancestor: Element | null = start.parentElement;
-
-  while (ancestor !== null && !overlayHost.contains(ancestor)) {
-    if (isProcessed(ancestor)) {
-      break;
-    }
-
-    if (
-      matchPlayerAndLine({
-        text: ancestor.textContent ?? "",
-        playersByNormalizedName,
-      }) !== null
-    ) {
-      addRowsFrom(ancestor);
-      break;
-    }
-
-    ancestor = ancestor.parentElement;
-  }
-
-  return [...rowsByNode];
-};
-
 const elementMatchesPlayerLine = (
   element: Element,
   playersByNormalizedName: Map<string, number>,
@@ -247,7 +210,7 @@ const hasTabLikeSibling = (element: Element): boolean => {
   return false;
 };
 
-const isTabLike = (element: Element): boolean => {
+export const isTabSelectionMutationTarget = (element: Element): boolean => {
   if (element.getAttribute("role") === "tab") {
     return true;
   }
@@ -257,26 +220,6 @@ const isTabLike = (element: Element): boolean => {
   }
 
   return hasTabLikeSibling(element);
-};
-
-const isSelectedTabLike = (element: Element): boolean => {
-  if (!isTabLike(element)) {
-    return false;
-  }
-
-  if (element.getAttribute("aria-selected") === "true") {
-    return true;
-  }
-
-  if (hasTruthyAriaState(element, "aria-current")) {
-    return true;
-  }
-
-  if (element.getAttribute("aria-pressed") === "true") {
-    return true;
-  }
-
-  return SELECTED_TAB_CLASS_PATTERN.test(element.getAttribute("class") ?? "");
 };
 
 const isTabContextNode = (element: Element): boolean => {
@@ -291,59 +234,76 @@ const isTabContextNode = (element: Element): boolean => {
   return element.querySelector('[role="tab"], [role="tablist"]') !== null;
 };
 
-const selectedTabLabelIn = (root: Element): string | null => {
-  const candidates = [root, ...root.querySelectorAll("*")];
+const isSelectedMarketChip = (element: Element): boolean => {
+  if (element.getAttribute("aria-selected") === "true") {
+    return true;
+  }
 
-  for (const element of candidates) {
-    if (!isSelectedTabLike(element)) {
+  if (element.getAttribute("aria-pressed") === "true") {
+    return true;
+  }
+
+  if (hasTruthyAriaState(element, "aria-current")) {
+    return true;
+  }
+
+  return SELECTED_TAB_CLASS_PATTERN.test(element.getAttribute("class") ?? "");
+};
+
+const isShortPointsMarketLabel = (text: string): boolean => {
+  const trimmed = text.trim();
+
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= MARKET_HEADER_MAX_LENGTH &&
+    isPointsMarketHeader(trimmed)
+  );
+};
+
+const isLeafLikeLabel = (element: Element, text: string): boolean =>
+  ![...element.children].some(
+    (child) => (child.textContent ?? "").trim() === text,
+  );
+
+const leafMarketLabelsIn = (
+  element: Element,
+): { element: Element; text: string }[] => {
+  const labels: { element: Element; text: string }[] = [];
+
+  for (const candidate of [element, ...element.querySelectorAll("*")]) {
+    const text = (candidate.textContent ?? "").trim();
+
+    if (!isMarketLikeHeader(text) || !isLeafLikeLabel(candidate, text)) {
       continue;
     }
 
-    const text = element.textContent ?? "";
+    labels.push({ element: candidate, text });
+  }
 
-    if (text.trim().length > 0) {
-      return text;
-    }
+  return labels;
+};
+
+const pickMarketLabel = (
+  labels: { element: Element; text: string }[],
+): string | null => {
+  if (labels.length === 0) {
+    return null;
+  }
+
+  const selected = labels.find((label) => isSelectedMarketChip(label.element));
+
+  if (selected !== undefined) {
+    return selected.text;
+  }
+
+  if (labels.length === 1) {
+    return labels[0]?.text ?? null;
   }
 
   return null;
 };
 
-const collectSelectedTabFromNode = (node: Node | null): string | null => {
-  let current = node;
-
-  while (current !== null) {
-    if (isElement(current)) {
-      const label = selectedTabLabelIn(current);
-
-      if (label !== null) {
-        return label;
-      }
-    }
-
-    current = current.previousSibling;
-  }
-
-  return null;
-};
-
-export const findNearestSelectedTabLabel = (row: Element): string => {
-  let current: Element | null = row;
-
-  while (current !== null) {
-    const found = collectSelectedTabFromNode(current.previousSibling);
-
-    if (found !== null) {
-      return found;
-    }
-
-    current = current.parentElement;
-  }
-
-  return "";
-};
-
-const collectHeaderFromNode = (
+const collectMarketHeaderFromNode = (
   node: Node | null,
   playersByNormalizedName: Map<string, number>,
 ): string | null => {
@@ -351,31 +311,28 @@ const collectHeaderFromNode = (
 
   while (current !== null) {
     if (current.nodeType === TEXT_NODE) {
-      const text = current.textContent ?? "";
+      const text = (current.textContent ?? "").trim();
 
-      if (normalizePlayerName(text).length > 0) {
+      if (isMarketLikeHeader(text)) {
         return text;
       }
     } else if (isElement(current)) {
       if (isTabContextNode(current)) {
+        const fromTabs = pickMarketLabel(leafMarketLabelsIn(current));
+
+        if (fromTabs !== null) {
+          return fromTabs;
+        }
+
         current = current.previousSibling;
         continue;
       }
 
       if (!elementMatchesPlayerLine(current, playersByNormalizedName)) {
-        const nested = collectHeaderFromNode(
-          current.lastChild,
-          playersByNormalizedName,
-        );
+        const picked = pickMarketLabel(leafMarketLabelsIn(current));
 
-        if (nested !== null) {
-          return nested;
-        }
-
-        const text = current.textContent ?? "";
-
-        if (normalizePlayerName(text).length > 0) {
-          return text;
+        if (picked !== null) {
+          return picked;
         }
       }
     }
@@ -386,14 +343,14 @@ const collectHeaderFromNode = (
   return null;
 };
 
-export const findNearestPrecedingHeaderText = (
+const findNearestPrecedingMarketHeader = (
   props: FindNearestPrecedingHeaderTextProps,
 ): string => {
   const { row, playersByNormalizedName } = props;
   let current: Element | null = row;
 
   while (current !== null) {
-    const found = collectHeaderFromNode(
+    const found = collectMarketHeaderFromNode(
       current.previousSibling,
       playersByNormalizedName,
     );
@@ -408,26 +365,48 @@ export const findNearestPrecedingHeaderText = (
   return "";
 };
 
+const findLeafPointsMarketLabelInRoot = (root: ParentNode): string => {
+  for (const element of root.querySelectorAll("*")) {
+    const text = (element.textContent ?? "").trim();
+
+    if (!isShortPointsMarketLabel(text) || !isLeafLikeLabel(element, text)) {
+      continue;
+    }
+
+    if (element.getAttribute("aria-selected") === "false") {
+      continue;
+    }
+
+    if (element.getAttribute("aria-pressed") === "false") {
+      continue;
+    }
+
+    return text;
+  }
+
+  return "";
+};
+
 export const findMarketContextText = (
   props: FindMarketContextTextProps,
 ): string => {
   const { row, playersByNormalizedName } = props;
-  const headerText = findNearestPrecedingHeaderText({
+  const headerText = findNearestPrecedingMarketHeader({
     row,
     playersByNormalizedName,
   });
 
-  if (isPointsMarketHeader(headerText)) {
+  if (headerText.length > 0) {
     return headerText;
   }
 
-  const tabLabel = findNearestSelectedTabLabel(row);
+  const documentRoot = row.ownerDocument;
 
-  if (tabLabel.length > 0) {
-    return tabLabel;
+  if (documentRoot === null) {
+    return "";
   }
 
-  return headerText;
+  return findLeafPointsMarketLabelInRoot(documentRoot);
 };
 
 const displayNameFromRow = (row: HTMLElement): string => {
@@ -444,7 +423,7 @@ const displayNameFromRow = (row: HTMLElement): string => {
 
 export const detectPointsPropRow = (
   props: DetectPointsPropRowProps,
-): FixtureRowProps | null => {
+): PropRow | null => {
   const { row, playersByNormalizedName } = props;
   const match = matchPlayerAndLine({
     text: row.textContent ?? "",
@@ -468,7 +447,7 @@ export const detectPointsPropRow = (
     player: displayNameFromRow(row) || match.normalizedName,
     playerId: String(match.playerId),
     stat: POINTS_STAT,
-    fixtureLine: match.line,
+    line: match.line,
     opponentCodes: [],
   };
 };

@@ -10,18 +10,19 @@ import { createRoot } from "react-dom/client";
 import { StyleSheetManager } from "styled-components";
 
 import { HitRateCard } from "../hitRateCard/HitRateCard";
-import type { FixtureRowProps } from "../fixtureHoverRoot/types/fixtureRow";
 import {
   OVERLAY_HOST_ATTR,
   SCAN_DEBOUNCE_MS,
+  SCAN_RETRY_DELAYS_MS,
 } from "../../lib/genericProp/constants/genericPropConstants";
 import {
   detectPointsPropRow,
   findSmallestPlayerLineRows,
-  findSmallestPlayerLineRowsFromChangedNode,
+  isTabSelectionMutationTarget,
   markProcessed,
 } from "../../lib/genericProp/detectPropRows";
 import { loadPlayerNameMap } from "../../lib/genericProp/playerNameMap";
+import type { PropRow } from "../../lib/genericProp/types/propRow";
 
 const queryClient = new QueryClient();
 
@@ -38,7 +39,7 @@ const PAGE_EVENTS = [
 
 interface ActiveProp {
   row: HTMLElement;
-  fixture: FixtureRowProps;
+  prop: PropRow;
   anchor: { top: number; left: number };
 }
 
@@ -88,13 +89,13 @@ const GenericPropHoverRoot = (
   }, [cancelHide]);
 
   const showRow = useCallback(
-    (row: HTMLElement, fixture: FixtureRowProps): void => {
+    (row: HTMLElement, prop: PropRow): void => {
       hoveringRowRef.current = true;
       cancelHide();
       const rect = row.getBoundingClientRect();
       setActive({
         row,
-        fixture,
+        prop,
         anchor: { top: rect.bottom, left: rect.left },
       });
     },
@@ -106,18 +107,18 @@ const GenericPropHoverRoot = (
 
     const bindRow = (row: HTMLElement): void => {
       row.addEventListener("mouseenter", () => {
-        const fixture = detectPointsPropRow({
+        const prop = detectPointsPropRow({
           row,
           playersByNormalizedName,
         });
 
-        if (fixture === null) {
+        if (prop === null) {
           hoveringRowRef.current = false;
           hideCard();
           return;
         }
 
-        showRow(row, fixture);
+        showRow(row, prop);
       });
       row.addEventListener("mouseleave", () => {
         hoveringRowRef.current = false;
@@ -147,33 +148,23 @@ const GenericPropHoverRoot = (
 
     scanRoot(document.body);
 
-    const pendingNodes = new Set<Node>();
     let debounceTimer = 0;
+    const retryTimers: number[] = [];
 
-    const flushChangedNodes = (): void => {
-      const nodes = [...pendingNodes];
-      pendingNodes.clear();
-
-      for (const node of nodes) {
-        bindRows(
-          findSmallestPlayerLineRowsFromChangedNode({
-            node,
-            overlayHost,
-            playersByNormalizedName,
-          }),
-        );
-      }
-    };
-
-    const scheduleScan = (node: Node): void => {
-      if (overlayHost.contains(node)) {
-        return;
-      }
-
-      pendingNodes.add(node);
+    const scheduleScan = (): void => {
       window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(flushChangedNodes, SCAN_DEBOUNCE_MS);
+      debounceTimer = window.setTimeout(() => {
+        scanRoot(document.body);
+      }, SCAN_DEBOUNCE_MS);
     };
+
+    for (const delayMs of SCAN_RETRY_DELAYS_MS) {
+      retryTimers.push(
+        window.setTimeout(() => {
+          scanRoot(document.body);
+        }, delayMs),
+      );
+    }
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -181,22 +172,21 @@ const GenericPropHoverRoot = (
           continue;
         }
 
-        if (mutation.type === "characterData") {
-          scheduleScan(mutation.target);
-          continue;
-        }
-
         if (mutation.type === "attributes") {
-          scheduleScan(mutation.target);
-          continue;
-        }
+          if (
+            mutation.target instanceof Element &&
+            isTabSelectionMutationTarget(mutation.target)
+          ) {
+            scheduleScan();
+            return;
+          }
 
-        for (const node of mutation.addedNodes) {
-          scheduleScan(node);
+          continue;
         }
 
         if (mutation.addedNodes.length > 0) {
-          scheduleScan(mutation.target);
+          scheduleScan();
+          return;
         }
       }
     });
@@ -204,7 +194,6 @@ const GenericPropHoverRoot = (
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      characterData: true,
       attributes: true,
       attributeFilter: [
         "aria-selected",
@@ -217,6 +206,9 @@ const GenericPropHoverRoot = (
     return () => {
       observer.disconnect();
       window.clearTimeout(debounceTimer);
+      for (const timer of retryTimers) {
+        window.clearTimeout(timer);
+      }
       cancelHide();
     };
   }, [overlayHost, showRow, hideCard, cancelHide]);
@@ -237,7 +229,7 @@ const GenericPropHoverRoot = (
       }}
     >
       <HitRateCard
-        fixture={active.fixture}
+        prop={active.prop}
         anchorTop={active.anchor.top}
         anchorLeft={active.anchor.left}
         rowElement={active.row}

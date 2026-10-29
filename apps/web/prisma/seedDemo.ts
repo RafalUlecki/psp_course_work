@@ -6,20 +6,16 @@ import { PrismaClient, Venue } from "@prisma/client";
 import {
   DEMO_CSV_RELATIVE_PATH,
   DEMO_CSV_SOURCE,
-  FIXTURE_PLAYER_NAME,
 } from "../src/lib/demoSeed/constants/demoSeedConstants";
 import { parsePlayerStatisticsCsv } from "../src/lib/demoSeed/parsePlayerStatistics";
 import {
-  defaultDemoPlayerNames,
   latestPlayersFromRows,
   parsePlayerNameList,
   resolveRequestedPlayers,
   rowsForPlayerIds,
-  withFixturePlayer,
 } from "../src/lib/demoSeed/selectDemoPlayers";
 import type { DemoPlayer } from "../src/lib/demoSeed/types/demoPlayer";
 import type { PlayerStatisticsRow } from "../src/lib/demoSeed/types/playerStatisticsRow";
-import { normalizePlayerName } from "../src/lib/players/normalizePlayerName";
 import {
   buildPlayerNameMap,
   toPlayersJson,
@@ -29,11 +25,10 @@ const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SEED_DIR, "..");
 const DEMO_CSV_PATH = path.resolve(APP_ROOT, DEMO_CSV_RELATIVE_PATH);
 const PLAYERS_JSON_PATH = path.resolve(APP_ROOT, "../extension/players.json");
-const FIXTURE_HTML_PATH = path.resolve(APP_ROOT, "public/fixture/props.html");
 const BATCH_SIZE = 100;
 
 interface SeedDemoCliOptions {
-  playerNames: string[];
+  playerNames: string[] | null;
 }
 
 interface UpsertGameLogsResult {
@@ -114,14 +109,15 @@ const parseArgs = (argv: string[]): SeedDemoCliOptions => {
     );
   }
 
-  const parsedNames =
-    playersRaw === undefined
-      ? defaultDemoPlayerNames()
-      : withFixturePlayer(parsePlayerNameList(playersRaw));
+  if (playersRaw === undefined) {
+    return { playerNames: null };
+  }
+
+  const parsedNames = parsePlayerNameList(playersRaw);
 
   if (parsedNames.length === 0) {
     throw new Error(
-      `No player names given. Always include the fixture player (${FIXTURE_PLAYER_NAME}).`,
+      `No player names given. Example: --players "Luka Doncic,Austin Reaves"`,
     );
   }
 
@@ -298,27 +294,6 @@ const writePlayersJson = (players: DemoPlayer[]): void => {
   writeFileSync(PLAYERS_JSON_PATH, toPlayersJson(buildPlayerNameMap(players)));
 };
 
-const writeFixturePlayerId = (playerId: number): void => {
-  if (!existsSync(FIXTURE_HTML_PATH)) {
-    throw new Error(`Fixture page not found: ${FIXTURE_HTML_PATH}`);
-  }
-
-  const html = readFileSync(FIXTURE_HTML_PATH, "utf8");
-  const updated = html.replace(
-    /data-prophover-player-id="[^"]*"/,
-    `data-prophover-player-id="${playerId}"`,
-  );
-
-  const alreadySet = html.includes(`data-prophover-player-id="${playerId}"`);
-  if (updated === html && !alreadySet) {
-    throw new Error(
-      `Could not update data-prophover-player-id in ${FIXTURE_HTML_PATH}`,
-    );
-  }
-
-  writeFileSync(FIXTURE_HTML_PATH, updated);
-};
-
 const loadCsvRows = (): PlayerStatisticsRow[] => {
   if (!existsSync(DEMO_CSV_PATH)) {
     throw new Error(`CSV file not found: ${DEMO_CSV_PATH}`);
@@ -327,78 +302,67 @@ const loadCsvRows = (): PlayerStatisticsRow[] => {
   return parsePlayerStatisticsCsv(readFileSync(DEMO_CSV_PATH, "utf8"));
 };
 
-const fixturePlayerId = (players: DemoPlayer[]): number => {
-  const fixture = players.find(
-    (player) =>
-      normalizePlayerName(player.name) ===
-      normalizePlayerName(FIXTURE_PLAYER_NAME),
-  );
-
-  if (fixture === undefined) {
-    throw new Error(
-      `Fixture player ${FIXTURE_PLAYER_NAME} was not in the seed set`,
-    );
-  }
-
-  return fixture.id;
-};
-
 const printSummary = (props: {
-  playerNames: string[];
+  seededAll: boolean;
   players: DemoPlayer[];
   inserted: number;
   updated: number;
   removedNonKaggle: number;
-  jokicId: number;
 }): void => {
-  const { playerNames, players, inserted, updated, removedNonKaggle, jokicId } =
-    props;
+  const { seededAll, players, inserted, updated, removedNonKaggle } = props;
   console.log(`CSV: ${DEMO_CSV_PATH}`);
-  console.log(`Players: ${playerNames.join(", ")}`);
-  for (const player of players) {
-    console.log(`  ${player.name} id=${player.id} team=${player.team}`);
+  if (seededAll) {
+    console.log(`Players: all (${players.length})`);
+  } else {
+    console.log(`Players: ${players.map((player) => player.name).join(", ")}`);
+    for (const player of players) {
+      console.log(`  ${player.name} id=${player.id} team=${player.team}`);
+    }
   }
   console.log(`Non-kaggle game logs removed: ${removedNonKaggle}`);
   console.log(`Game logs inserted: ${inserted}`);
   console.log(`Game logs updated: ${updated}`);
-  console.log(`Wrote ${PLAYERS_JSON_PATH}`);
-  console.log(
-    `Fixture ${FIXTURE_PLAYER_NAME} data-prophover-player-id=${jokicId}`,
-  );
+  console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
 };
 
 const main = async (): Promise<void> => {
   const options = parseArgs(process.argv.slice(2));
   const rows = loadCsvRows();
   const catalog = latestPlayersFromRows(rows);
-  const resolved = resolveRequestedPlayers({
-    requestedNames: options.playerNames,
-    catalog,
-  });
+  const seededAll = options.playerNames === null;
+  let players: DemoPlayer[];
 
-  if (resolved.missing.length > 0) {
-    throw missingPlayersError(resolved.missing);
+  if (options.playerNames === null) {
+    players = catalog;
+  } else {
+    const resolved = resolveRequestedPlayers({
+      requestedNames: options.playerNames,
+      catalog,
+    });
+
+    if (resolved.missing.length > 0) {
+      throw missingPlayersError(resolved.missing);
+    }
+
+    players = resolved.players;
   }
 
-  const playerIds = resolved.players.map((player) => player.id);
+  const playerIds = players.map((player) => player.id);
   const selectedRows = rowsForPlayerIds({ rows, playerIds });
 
-  await upsertPlayers(resolved.players);
+  await upsertPlayers(players);
   const { inserted, updated, removedNonKaggle } = await upsertGameLogs({
     rows: selectedRows,
     playerIds,
   });
-  writePlayersJson(resolved.players);
-  const jokicId = fixturePlayerId(resolved.players);
-  writeFixturePlayerId(jokicId);
+  writePlayersJson(players);
 
   printSummary({
-    playerNames: options.playerNames,
-    players: resolved.players,
+    seededAll,
+    players,
     inserted,
     updated,
     removedNonKaggle,
-    jokicId,
   });
 };
 

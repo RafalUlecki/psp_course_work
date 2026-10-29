@@ -42,7 +42,7 @@ const stop = (event: SyntheticEvent): void => {
 
 export const HitRateCard = (props: HitRateCardProps): ReactElement => {
   const {
-    fixture,
+    prop,
     anchorTop,
     anchorLeft,
     onLineSliderActiveChange,
@@ -50,8 +50,8 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
     rowElement,
   } = props;
 
-  const { playerId, stat, fixtureLine, opponentCodes } = fixture;
-  const lineSlider = resolveLineSliderBounds({ fixtureLine });
+  const { playerId, stat, line: propLine, opponentCodes } = prop;
+  const lineSlider = resolveLineSliderBounds({ fixtureLine: propLine });
   const { min: lineMin, max: lineMax, step: lineStep } = lineSlider;
 
   const form = useForm({
@@ -59,7 +59,7 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
       lastN: HitRateLastN.Ten,
       opponent: HitRateVenueFilter.All as string,
       venue: HitRateVenueFilter.All as string,
-      line: fixtureLine,
+      line: propLine,
     },
   });
 

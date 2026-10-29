@@ -10,7 +10,6 @@ import {
   detectPointsPropRow,
   findMarketContextText,
   findSmallestPlayerLineRows,
-  findSmallestPlayerLineRowsFromChangedNode,
   isPointsMarketHeader,
   isProcessed,
   markProcessed,
@@ -29,7 +28,6 @@ const extensionRoot = dirname(fileURLToPath(import.meta.url));
 
 interface ExtensionManifest {
   content_scripts: { matches: string[] }[];
-  host_permissions: string[];
 }
 
 const readManifest = (): ExtensionManifest =>
@@ -123,317 +121,174 @@ describe("markProcessed", () => {
 });
 
 describe("detectPointsPropRow", () => {
+  it("should return a PTS prop when a team title sits between the row and the points header", () => {
+    const document = documentFrom(`
+      <section>
+        <header>
+          <div>Žaidėjo pelnyti taškai</div>
+        </header>
+        <div>
+          <div>Los Angeles Lakers</div>
+          <div id="row">
+            <span>Luka Doncic </span>
+            <div>Daugiau 30.5</div>
+            <div>1.90</div>
+            <div>Mažiau 30.5</div>
+            <div>1.80</div>
+          </div>
+        </div>
+      </section>
+    `);
+    const row = document.getElementById("row");
+
+    assert.deepEqual(
+      row === null
+        ? null
+        : detectPointsPropRow({ row, playersByNormalizedName }),
+      {
+        player: "Luka Doncic",
+        playerId: "1629029",
+        stat: "PTS",
+        line: 30.5,
+        opponentCodes: [],
+      },
+    );
+  });
+
+  it("should skip the row when the nearest market header is assists", () => {
+    const document = documentFrom(`
+      <section>
+        <header>
+          <div>Žaidėjo rezultatyvūs perdavimai</div>
+        </header>
+        <div id="row">
+          <span>Luka Doncic </span>
+          <div>Daugiau 8.5</div>
+        </div>
+      </section>
+    `);
+    const row = document.getElementById("row");
+
+    assert.equal(
+      row === null
+        ? "missing"
+        : detectPointsPropRow({ row, playersByNormalizedName }),
+      null,
+    );
+  });
+
+  it("should skip a rebounds row when a points market section precedes it", () => {
+    const document = documentFrom(`
+      <section>
+        <header><div>Žaidėjo pelnyti taškai</div></header>
+        <div>
+          <div>Los Angeles Lakers</div>
+          <div>
+            <span>Luka Doncic </span>
+            <div>Daugiau 30.5</div>
+          </div>
+        </div>
+      </section>
+      <section>
+        <header><div>Žaidėjo atkovoti kamuoliai</div></header>
+        <div>
+          <div>Los Angeles Lakers</div>
+          <div id="row">
+            <span>Luka Doncic </span>
+            <div>Daugiau 7.5</div>
+          </div>
+        </div>
+      </section>
+    `);
+    const row = document.getElementById("row");
+
+    assert.equal(
+      row === null
+        ? "missing"
+        : detectPointsPropRow({ row, playersByNormalizedName }),
+      null,
+    );
+  });
+
+  it("should skip the row when the nearest market header is a combo with a plus", () => {
+    const document = documentFrom(`
+      <section>
+        <header>
+          <div>Žaidėjo surinkti Taškai + Kamuoliai</div>
+        </header>
+        <div id="row">
+          <span>Luka Doncic </span>
+          <div>Daugiau 39.5</div>
+        </div>
+      </section>
+    `);
+    const row = document.getElementById("row");
+
+    assert.equal(
+      row === null
+        ? "missing"
+        : detectPointsPropRow({ row, playersByNormalizedName }),
+      null,
+    );
+  });
+
+  it("should return a PTS prop when the selected tab is a points market", () => {
+    const document = documentFrom(`
+      <div role="tablist">
+        <button role="tab" aria-selected="true">Žaidėjo pelnyti taškai</button>
+        <button role="tab" aria-selected="false">Žaidėjo atkovoti kamuoliai</button>
+      </div>
+      <div id="row">
+        <span>Luka Doncic </span>
+        <div>Daugiau 30.5</div>
+      </div>
+    `);
+    const row = document.getElementById("row");
+
+    assert.equal(
+      row === null
+        ? null
+        : detectPointsPropRow({ row, playersByNormalizedName })?.stat,
+      "PTS",
+    );
+  });
+
   it("should select the smallest wrapping element when nested nodes contain the name and line", () => {
     const document = documentFrom(`
       <section>
         <h2>Žaidėjo pelnyti taškai</h2>
-        <div id="row">
-          <span>Luka Doncic </span>
-          <div>Daugiau 30.5</div>
-          <div>1.80</div>
-          <div>Mažiau 30.5</div>
-          <div>1.90</div>
+        <div id="outer">
+          <div id="row">
+            <span>Luka Doncic </span>
+            <div>Daugiau 30.5</div>
+          </div>
         </div>
       </section>
     `);
-    const rows = findSmallestPlayerLineRows({
+    const ids = findSmallestPlayerLineRows({
       root: document.body,
       playersByNormalizedName,
-    });
+    }).map((row) => row.id);
 
-    assert.deepEqual(
-      rows.map((row) => row.id),
-      ["row"],
-    );
-  });
-
-  it("should return a PTS fixture when the nearest header is a points market", () => {
-    const document = documentFrom(`
-      <section>
-        <h2>Žaidėjo pelnyti taškai</h2>
-        <div id="row">
-          <span>Luka Doncic </span>
-          <div>Daugiau 30.5</div>
-        </div>
-      </section>
-    `);
-    const row = document.getElementById("row");
-
-    assert.deepEqual(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      {
-        player: "Luka Doncic",
-        playerId: "1629029",
-        stat: "PTS",
-        fixtureLine: 30.5,
-        opponentCodes: [],
-      },
-    );
-  });
-
-  it("should skip the row when the nearest header is a combo market", () => {
-    const document = documentFrom(`
-      <section>
-        <h2>Žaidėjo taškai + atkovoti kamuoliai</h2>
-        <div id="row">
-          <span>Austin Reaves </span>
-          <div>Daugiau 12.5</div>
-        </div>
-      </section>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? "missing"
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      null,
-    );
-  });
-
-  it("should skip the row when the nearest header is a rebounds market", () => {
-    const document = documentFrom(`
-      <section>
-        <h2>Žaidėjo atkovoti kamuoliai</h2>
-        <div id="row">
-          <span>Nikola Jokic </span>
-          <div>Daugiau 10.5</div>
-        </div>
-      </section>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? "missing"
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      null,
-    );
-  });
-
-  it("should return a PTS fixture when the selected tab is a points market", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-selected="true">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-selected="false">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-
-    assert.deepEqual(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      {
-        player: "Luka Doncic",
-        playerId: "1629029",
-        stat: "PTS",
-        fixtureLine: 30.5,
-        opponentCodes: [],
-      },
-    );
-  });
-
-  it("should skip the row when a points tab exists but is not selected", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-selected="false">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-selected="true">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? "missing"
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      null,
-    );
-  });
-
-  it("should skip the row when the selected tab contains taškai and a plus", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-selected="false">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-selected="true">Žaidėjo taškai + atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 40.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? "missing"
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      null,
-    );
-  });
-
-  it("should return a PTS fixture when the selected tab uses aria-pressed", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-pressed="true">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-pressed="false">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName })?.stat,
-      "PTS",
-    );
-  });
-
-  it("should return a PTS fixture when the selected tab uses aria-current", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-current="true">Žaidėjo pelnyti taškai</button>
-        <button role="tab">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-
-    assert.equal(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName })?.stat,
-      "PTS",
-    );
-  });
-
-  it("should extract line 28.5 when the same row text changes to a new points line", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-selected="true">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-selected="false">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div id="over">Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-    const over = document.getElementById("over");
-
-    if (over !== null) {
-      over.textContent = "Daugiau 28.5";
-    }
-
-    assert.equal(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName })?.fixtureLine,
-      28.5,
-    );
-  });
-
-  it("should skip the row when the selected tab is switched to a rebounds market", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button id="points-tab" role="tab" aria-selected="true">Žaidėjo pelnyti taškai</button>
-        <button id="rebounds-tab" role="tab" aria-selected="false">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div id="over">Daugiau 30.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-    const pointsTab = document.getElementById("points-tab");
-    const reboundsTab = document.getElementById("rebounds-tab");
-    const over = document.getElementById("over");
-
-    if (pointsTab !== null) {
-      pointsTab.setAttribute("aria-selected", "false");
-    }
-
-    if (reboundsTab !== null) {
-      reboundsTab.setAttribute("aria-selected", "true");
-    }
-
-    if (over !== null) {
-      over.textContent = "Daugiau 8.5";
-    }
-
-    assert.equal(
-      row === null
-        ? "missing"
-        : detectPointsPropRow({ row, playersByNormalizedName }),
-      null,
-    );
-  });
-
-  it("should return a PTS fixture when the selected tab is switched back to points", () => {
-    const document = documentFrom(`
-      <div role="tablist">
-        <button id="points-tab" role="tab" aria-selected="false">Žaidėjo pelnyti taškai</button>
-        <button id="rebounds-tab" role="tab" aria-selected="true">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div id="over">Daugiau 8.5</div>
-      </div>
-    `);
-    const row = document.getElementById("row");
-    const pointsTab = document.getElementById("points-tab");
-    const reboundsTab = document.getElementById("rebounds-tab");
-    const over = document.getElementById("over");
-
-    if (pointsTab !== null) {
-      pointsTab.setAttribute("aria-selected", "true");
-    }
-
-    if (reboundsTab !== null) {
-      reboundsTab.setAttribute("aria-selected", "false");
-    }
-
-    if (over !== null) {
-      over.textContent = "Daugiau 30.5";
-    }
-
-    assert.equal(
-      row === null
-        ? null
-        : detectPointsPropRow({ row, playersByNormalizedName })?.fixtureLine,
-      30.5,
-    );
+    assert.deepEqual(ids, ["row"]);
   });
 });
 
 describe("findMarketContextText", () => {
-  it("should read the selected tab label when the market title is a selected tab", () => {
+  it("should skip a team title and read the points market header above it", () => {
     const document = documentFrom(`
-      <div role="tablist">
-        <button role="tab" aria-selected="true">Žaidėjo pelnyti taškai</button>
-        <button role="tab" aria-selected="false">Žaidėjo atkovoti kamuoliai</button>
-      </div>
-      <div id="row">
-        <span>Luka Doncic </span>
-        <div>Daugiau 30.5</div>
-      </div>
+      <section>
+        <header>
+          <div>Žaidėjo pelnyti taškai</div>
+        </header>
+        <div>
+          <div>Utah Jazz</div>
+          <div id="row">
+            <span>Luka Doncic </span>
+            <div>Daugiau 30.5</div>
+          </div>
+        </div>
+      </section>
     `);
     const row = document.getElementById("row");
 
@@ -447,56 +302,30 @@ describe("findMarketContextText", () => {
       "Žaidėjo pelnyti taškai",
     );
   });
-});
 
-describe("findSmallestPlayerLineRowsFromChangedNode", () => {
-  it("should select the wrapping row when a descendant text node is filled after load", () => {
+  it("should read a points market label from the page when no header precedes the row", () => {
     const document = documentFrom(`
-      <div id="overlay"></div>
+      <div>Žaidėjo pelnyti taškai</div>
       <div id="row">
-        <span id="name"></span>
-        <div id="over"></div>
+        <span>Zion Williamson </span>
+        <div>Daugiau 20.5</div>
       </div>
     `);
-    const overlayHost = document.getElementById("overlay");
-    const name = document.getElementById("name");
-    const over = document.getElementById("over");
+    const row = document.getElementById("row");
 
-    if (name !== null) {
-      name.textContent = "Luka Doncic ";
-    }
-
-    if (over !== null) {
-      over.textContent = "Daugiau 30.5";
-    }
-
-    const changed = name?.firstChild ?? name;
-
-    assert.deepEqual(
-      overlayHost === null || changed === null
-        ? []
-        : findSmallestPlayerLineRowsFromChangedNode({
-            node: changed,
-            overlayHost,
-            playersByNormalizedName,
-          }).map((row) => row.id),
-      ["row"],
+    assert.equal(
+      row === null
+        ? null
+        : detectPointsPropRow({ row, playersByNormalizedName })?.stat,
+      "PTS",
     );
   });
 });
 
 describe("manifest", () => {
-  it("should list the fixture match before betsson.lt in content_scripts.matches", () => {
+  it("should match only betsson.lt in content_scripts.matches", () => {
     assert.deepEqual(readManifest().content_scripts[0]?.matches, [
-      "http://localhost/fixture/*",
       "https://www.betsson.lt/*",
     ]);
-  });
-
-  it("should list the local API host in host_permissions", () => {
-    assert.equal(
-      readManifest().host_permissions.includes("http://localhost:3000/*"),
-      true,
-    );
   });
 });

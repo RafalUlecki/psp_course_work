@@ -11,7 +11,7 @@ One-time setup: Postgres running, `apps/web/.env` and `apps/extension/.env` from
 ```bash
 cd apps/web
 npm run db:migrate
-npm run seed:demo -- --players "Luka Doncic,Austin Reaves"
+npm run seed:demo
 ```
 
 From the repo root (install each app once if you have not already):
@@ -23,7 +23,7 @@ npm install --prefix apps/extension
 npm start
 ```
 
-That runs Next on [http://localhost:3000](http://localhost:3000) and rebuilds the extension into `apps/extension/dist` on change. Load unpacked once from `apps/extension/dist`, then reload the extension after the first build (and after `seed:demo`).
+That runs Next on [http://localhost:3000](http://localhost:3000) (hit-rate API) and rebuilds the extension into `apps/extension/dist` on change. Load unpacked once from `apps/extension/dist`, then open **betsson.lt** and hover a seeded player under **Žaidėjo pelnyti taškai**. Reload the extension after the first build and after `seed:demo`.
 
 Postgres schema and migrations live in `apps/web/prisma/`. See [apps/web/README.md](apps/web/README.md#database-prisma--postgres) for how to run migrations against local Postgres.
 
@@ -32,10 +32,10 @@ Demo seed (2025–26 box scores, NBA `personId` as `players.id`):
 ```bash
 cd apps/web
 npm run db:migrate
-npm run seed:demo -- --players "Luka Doncic,Austin Reaves"
+npm run seed:demo
 ```
 
-That command reads only the committed CSV (no network). Re-run it the day before a demo, then **rebuild and reload the Chrome extension** so `apps/extension/players.json` stays in sync. Source and licence: [apps/web/data/README.md](apps/web/data/README.md).
+That seeds everyone in the CSV (no network). Re-run after CSV updates, then **rebuild and reload the Chrome extension** so `apps/extension/players.json` stays in sync. Source and licence: [apps/web/data/README.md](apps/web/data/README.md).
 
 ## `apps/web` structure
 
@@ -43,18 +43,9 @@ Each **page** or **app shell feature** lives in a private folder under `app/` (p
 
 ```
 app/
-  page.tsx              # route entry only (Next.js)
+  page.tsx              # route entry (minimal; API is the product surface)
   layout.tsx
-  _features/            # all page features (private — not in URL)
-    home/               # `/` feature
-      HomePage.tsx
-      components/       # PascalCase.tsx
-      styles/           # camelCase.ts (e.g. homeHeading.ts)
-      types/            # camelCase.ts (e.g. providersProps.ts)
-      utils/            # camelCase.ts (e.g. getQueryClient.ts) — add when needed
-    settings/           # example: `/settings` → app/settings/page.tsx
-      SettingsPage.tsx
-      …
+  api/                  # thin route handlers → src/lib
   _app/                 # root layout shell (providers, etc.)
     Providers.tsx
     utils/
@@ -62,6 +53,5 @@ app/
     types/
 ```
 
-**Naming:** `PascalCase.tsx` for pages and components; `camelCase.ts` for utils, types, and style modules (e.g. `getQueryClient.ts`, `homeHeading.ts`).
+**Naming:** `PascalCase.tsx` for pages and components; `camelCase.ts` for utils, types, and style modules.
 
-**New route example:** `app/settings/page.tsx` imports `./_features/settings/SettingsPage`.

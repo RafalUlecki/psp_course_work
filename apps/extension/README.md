@@ -1,57 +1,34 @@
 # PropHover extension
 
-Chrome MV3 content script for local fixture pages (`http://localhost/fixture/*`, any port) and `https://www.betsson.lt/*`.
+Chrome MV3 content script for `https://www.betsson.lt/*`.
 
-**Stack:** Vite, React, styled-components, TanStack Query (`useQuery`).
+## Behaviour
 
-UI lives under `src/components/<feature>/`. Split out `requests/`, `utils/`, or `types/` only when a file would otherwise mix unrelated jobs.
+Looks for player-name + line rows (bundled `players.json`) under a points market header containing `taškai` and not `+` (e.g. **Žaidėjo pelnyti taškai**). Hit-rate requests go through the background service worker to the Next API. The hover card is a fixed overlay on `document.body`.
 
-The fixture `data-prophover-*` path runs first. If that row is missing, a generic text/structure detector looks for player-name rows (bundled `players.json`) under a points market header containing `taškai` and not `+`. The hover card is a fixed overlay on `document.body`.
+## Setup
 
-## API base URL
-
-Hit-rate requests go through the background service worker to `{VITE_HIT_RATE_API_BASE}/api/hit-rate`. That value is a Vite env constant, read at **build** time (no options page). It defaults to `http://localhost:3000`.
-
-| Setup | `VITE_HIT_RATE_API_BASE` | Also required |
-| --- | --- | --- |
-| Local Next API (typical unpacked dev) | `http://localhost:3000` — same as `NEXT_PUBLIC_API_BASE_URL` in `apps/web/.env.example` | `host_permissions` already include `http://localhost:3000/*` |
-| Packaged extension → hosted API | the hosted origin, e.g. `https://api.example.com` | replace `https://YOUR_HOSTED_API_ORIGIN.example/*` in `manifest.src.json` `host_permissions` |
-
-Copy `.env.example` to `.env` before building. Do not commit `.env`. Production deploy automation is out of scope.
-
-## Develop
-
-1. Start the web app: `cd apps/web && npm run dev`
-2. Copy `apps/extension/.env.example` to `apps/extension/.env`. Keep `VITE_HIT_RATE_API_BASE="http://localhost:3000"` to call the local Next API.
-3. Build (or watch) the extension:
+1. From `apps/web`, migrate and seed (all CSV players by default):
 
    ```bash
-   cd apps/extension
-   npm install
-   npm run build
-   # or: npm run dev
+   npm run db:migrate
+   npm run seed:demo
+   npm run start
    ```
 
-4. In Chrome: **Extensions → Load unpacked** → select **`apps/extension/dist`**
-5. Open `http://localhost:3000/fixture/props.html` and hover the props row.
-6. Generic detector (no `data-prophover-*`): `http://localhost:3000/fixture/generic-rows.html`
+2. Copy `apps/extension/.env.example` to `apps/extension/.env`. Keep `VITE_HIT_RATE_API_BASE="http://localhost:3000"`.
 
-Reload the extension after each production build (or after watch rebuilds). After `npm run seed:demo` in `apps/web` (it rewrites `players.json` and the fixture player id), rebuild the extension and reload it in Chrome.
+3. Build (PowerShell):
 
-## Playwright
+   ```powershell
+   cd apps\extension
+   npm run build
+   ```
 
-```bash
-# Mock API — no database (CI default)
-cd apps/extension
-npm run test:e2e
+   Or: `$env:VITE_HIT_RATE_API_BASE = "http://localhost:3000"; npm run build`
 
-# Real local API — fixture page via the background service worker
-cd apps/web
-npx prisma migrate reset --force
-npm run seed:demo
-npm run start   # or npm run dev
-cd ../extension
-VITE_HIT_RATE_API_BASE=http://localhost:3000 npm run build
-npm run test:e2e:fixture
-```
+4. Chrome → `chrome://extensions` → Load unpacked → `apps/extension/dist`.
 
+5. Open a Betsson NBA event, market **Žaidėjo pelnyti taškai**, hover a seeded player.
+
+Reload the extension after each build and after `seed:demo` (it rewrites `players.json`).

@@ -63,32 +63,3 @@ jobs:
         env:
           VITE_HIT_RATE_API_BASE: http://localhost:3000
         run: npm run build
-
-      - name: Install Playwright Chromium
-        working-directory: apps/extension
-        run: npx playwright install chromium --with-deps
-
-      - name: Playwright generic rows and tabs
-        working-directory: apps/extension
-        run: npm run test:e2e
-
-      - name: Reset and seed database
-        run: |
-          npx prisma migrate reset --force
-          npm run seed:demo
-
-      - name: Start web
-        run: |
-          npm run start &
-          for i in $(seq 1 40); do
-            if curl -sf http://localhost:3000/fixture/props.html >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "web did not start on :3000"
-          exit 1
-
-      - name: Playwright fixture props
-        working-directory: apps/extension
-        run: npm run test:e2e:fixture
