@@ -6,6 +6,8 @@
   "background": {
     "service_worker": "background.js"
   },
+  "permissions": ["storage"],
+  "options_page": "options.html",
   "host_permissions": [
     "http://localhost:3000/*",
     "https://YOUR_HOSTED_API_ORIGIN.example/*"

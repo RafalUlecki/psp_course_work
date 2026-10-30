@@ -61,6 +61,8 @@ npm run seed:demo
 
 That seeds **every** player in the CSV into Postgres and writes the full name→id map to `apps/extension/players.json`. Optional filter: `npm run seed:demo -- --players "Luka Doncic,Austin Reaves"`. Idempotent. After re-seeding, rebuild and **reload the Chrome extension**. Source, licence, and columns: [`data/README.md`](data/README.md).
 
+The same command upserts test **Client A** (`A`) and **Client B** (`B`) plus one watchlist row each. Watchlist reads/writes are scoped by the `X-Client-Id` header; see the root [README](../../README.md#test-clients-a-vs-b) for curl examples.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

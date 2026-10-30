@@ -31,4 +31,6 @@ Looks for player-name + line rows (bundled `players.json`) under a points market
 
 5. Open a Betsson NBA event, market **Žaidėjo pelnyti taškai**, hover a seeded player.
 
-Reload the extension after each build and after `seed:demo` (it rewrites `players.json`).
+6. Pick **Client A** or **Client B** in extension options (`chrome://extensions` → PropHover → **Details** → **Extension options**). The hover-card star adds/removes that player on the selected client’s watchlist. Switching A/B changes which stars are filled.
+
+Reload the extension after each build and after `seed:demo` (it rewrites `players.json`). The selected client is stored in `chrome.storage.local` (`clientId`) and sent as `X-Client-Id` on watchlist requests.

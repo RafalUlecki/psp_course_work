@@ -10,6 +10,8 @@ import {
   HitRateLastN,
   HitRateVenueFilter,
 } from "./constants/hitRateCardConstants";
+import { useClientId } from "../../settings/useClientId";
+import { WatchlistStar } from "../watchlist/WatchlistStar";
 import { useHitRateQuery } from "./requests/useHitRateQuery";
 import type { HitRateCardProps } from "./types/hitRateCard";
 import {
@@ -30,6 +32,7 @@ import {
   LineValue,
   Panel,
   Summary,
+  SummaryRow,
   ToggleButton,
   ToggleRow,
 } from "./hitRateCardStyles";
@@ -51,6 +54,7 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
   } = props;
 
   const { playerId, stat, line: propLine, opponentCodes } = prop;
+  const clientId = useClientId();
   const lineSlider = resolveLineSliderBounds({ fixtureLine: propLine });
   const { min: lineMin, max: lineMax, step: lineStep } = lineSlider;
 
@@ -122,19 +126,23 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
       <HitRateCardGlobalStyle />
       <Panel
         data-prophover-card=""
+        data-prophover-client-id={clientId}
         onClick={stop}
         onMouseDown={stop}
         onMouseUp={stop}
         onPointerDown={stop}
         onPointerUp={stop}
       >
-        <Summary
-          data-prophover-summary=""
-          data-prophover-state={viewStatus}
-          $viewStatus={viewStatus}
-        >
-          {summaryText}
-        </Summary>
+        <SummaryRow>
+          <Summary
+            data-prophover-summary=""
+            data-prophover-state={viewStatus}
+            $viewStatus={viewStatus}
+          >
+            {summaryText}
+          </Summary>
+          <WatchlistStar clientId={clientId} playerId={playerId} />
+        </SummaryRow>
         <ToggleRow data-prophover-last-n-toggle="">
           {HIT_RATE_LAST_N_OPTIONS.map((value) => (
             <ToggleButton

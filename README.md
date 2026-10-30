@@ -37,6 +37,36 @@ npm run seed:demo
 
 That seeds everyone in the CSV (no network). Re-run after CSV updates, then **rebuild and reload the Chrome extension** so `apps/extension/players.json` stays in sync. Source and licence: [apps/web/data/README.md](apps/web/data/README.md).
 
+## Test clients (A vs B)
+
+`seed:demo` also upserts two hard-coded clients, **Client A** (`id: A`) and **Client B** (`id: B`), each with one player-watchlist row (`clientId` FK). Player stats and game logs stay shared. Default seed puts Nikola Jokic on A’s watchlist and Luka Doncic on B’s.
+
+The extension sends `X-Client-Id` on watchlist list/add/remove. There is no login: pick **Client A** or **Client B** on the extension options page (`chrome://extensions` → PropHover → **Details** → **Extension options**). That choice is stored in `chrome.storage.local` (`clientId`) and used as the header. Switching clients changes which hover-card stars are filled.
+
+```bash
+# Client A's watchlist only
+curl -s http://localhost:3000/api/watchlist -H "X-Client-Id: A"
+
+# Client B's watchlist only
+curl -s http://localhost:3000/api/watchlist -H "X-Client-Id: B"
+
+# Missing or unknown ids are rejected (400 / 401) and never fall back to the other client
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/watchlist
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/api/watchlist -H "X-Client-Id: Z"
+```
+
+Add/remove (star button uses the same routes):
+
+```bash
+curl -s -X POST http://localhost:3000/api/watchlist \
+  -H "X-Client-Id: A" \
+  -H "Content-Type: application/json" \
+  -d '{"playerId":203999}'
+
+curl -s -X DELETE "http://localhost:3000/api/watchlist?playerId=203999" \
+  -H "X-Client-Id: A"
+```
+
 ## `apps/web` structure
 
 Each **page** or **app shell feature** lives in a private folder under `app/` (prefix `_` so it is not a URL segment). Inside the feature:

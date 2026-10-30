@@ -60,6 +60,13 @@ interface SummaryProps {
   $viewStatus: string;
 }
 
+export const SummaryRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+`;
+
 export const Summary = styled.div<SummaryProps>`
   white-space: nowrap;
   font-size: 0.875rem;

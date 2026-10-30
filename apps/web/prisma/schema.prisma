@@ -13,12 +13,33 @@ enum Venue {
 }
 
 model Player {
-  id       Int       @id
-  name     String    @unique
-  team     String?
-  gameLogs GameLog[]
+  id             Int             @id
+  name           String          @unique
+  team           String?
+  gameLogs       GameLog[]
+  watchlistItems WatchlistItem[]
 
   @@map("players")
+}
+
+model Client {
+  id             String          @id
+  name           String
+  watchlistItems WatchlistItem[]
+
+  @@map("clients")
+}
+
+model WatchlistItem {
+  id       Int    @id @default(autoincrement())
+  clientId String @map("client_id")
+  playerId Int    @map("player_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, playerId])
+  @@index([clientId])
+  @@map("watchlist_items")
 }
 
 model GameLog {

@@ -4,14 +4,18 @@ import react from "@vitejs/plugin-react";
 import { buildSync } from "esbuild";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
-const copyManifestPlugin = (): Plugin => ({
-  name: "copy-manifest",
+const copyStaticExtensionFilesPlugin = (): Plugin => ({
+  name: "copy-static-extension-files",
   closeBundle() {
     const distDir = resolve(__dirname, "dist");
     mkdirSync(distDir, { recursive: true });
     copyFileSync(
       resolve(__dirname, "manifest.src.json"),
       resolve(distDir, "manifest.json"),
+    );
+    copyFileSync(
+      resolve(__dirname, "options.html"),
+      resolve(distDir, "options.html"),
     );
   },
 });
@@ -32,12 +36,30 @@ const bundleBackgroundPlugin = (apiBase: string): Plugin => ({
   },
 });
 
+const bundleOptionsPlugin = (): Plugin => ({
+  name: "bundle-options",
+  closeBundle() {
+    buildSync({
+      entryPoints: [resolve(__dirname, "src/options.ts")],
+      outfile: resolve(__dirname, "dist/options.js"),
+      bundle: true,
+      format: "iife",
+      target: "chrome114",
+    });
+  },
+});
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "VITE_");
   const apiBase = env.VITE_HIT_RATE_API_BASE || "http://localhost:3000";
 
   return {
-    plugins: [react(), bundleBackgroundPlugin(apiBase), copyManifestPlugin()],
+    plugins: [
+      react(),
+      bundleBackgroundPlugin(apiBase),
+      bundleOptionsPlugin(),
+      copyStaticExtensionFilesPlugin(),
+    ],
     build: {
       outDir: "dist",
       emptyOutDir: true,
