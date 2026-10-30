@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isPlayerOnWatchlist } from "./isPlayerOnWatchlist";
+import { isPlayerOnWatchlist } from "./src/components/watchlist/utils/isPlayerOnWatchlist";
 
 describe("isPlayerOnWatchlist", () => {
   it("should return true when the player id is in the watchlist", () => {

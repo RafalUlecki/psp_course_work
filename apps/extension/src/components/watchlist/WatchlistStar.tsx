@@ -6,7 +6,7 @@ import {
   useWatchlistToggle,
 } from "./requests/useWatchlistQuery";
 import { isPlayerOnWatchlist } from "./utils/isPlayerOnWatchlist";
-import { StarButton } from "./hitRateCardStyles";
+import { StarButton } from "./watchlistStyles";
 
 interface WatchlistStarProps {
   clientId: TestClientId;

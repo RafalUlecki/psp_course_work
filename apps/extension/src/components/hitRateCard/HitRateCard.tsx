@@ -11,7 +11,7 @@ import {
   HitRateVenueFilter,
 } from "./constants/hitRateCardConstants";
 import { useClientId } from "../../settings/useClientId";
-import { WatchlistStar } from "./WatchlistStar";
+import { WatchlistStar } from "../watchlist/WatchlistStar";
 import { useHitRateQuery } from "./requests/useHitRateQuery";
 import type { HitRateCardProps } from "./types/hitRateCard";
 import {
