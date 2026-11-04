@@ -24,7 +24,6 @@ import { useDebouncedValue } from "./utils/useDebouncedValue";
 import {
   CardAnchor,
   FilterLabel,
-  FilterSelect,
   FiltersRow,
   HitRateCardGlobalStyle,
   LineControl,
@@ -213,22 +212,24 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
             {(field) => (
               <FilterLabel>
                 Opponent
-                <FilterSelect
-                  data-prophover-opponent=""
-                  value={field.state.value}
-                  onClick={stop}
-                  onChange={(event) => {
-                    event.preventDefault();
-                    stop(event);
-                    field.handleChange(event.currentTarget.value);
-                  }}
-                >
+                <ToggleRow data-prophover-opponent-toggle="">
                   {opponentOptions.map((option) => (
-                    <option key={option.value || "all"} value={option.value}>
+                    <ToggleButton
+                      key={option.value || "all"}
+                      type="button"
+                      data-prophover-opponent={option.value || "all"}
+                      $selected={field.state.value === option.value}
+                      aria-pressed={field.state.value === option.value}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        stop(event);
+                        field.handleChange(option.value);
+                      }}
+                    >
                       {option.label}
-                    </option>
+                    </ToggleButton>
                   ))}
-                </FilterSelect>
+                </ToggleRow>
               </FilterLabel>
             )}
           </form.Field>
@@ -236,22 +237,24 @@ export const HitRateCard = (props: HitRateCardProps): ReactElement => {
             {(field) => (
               <FilterLabel>
                 Venue
-                <FilterSelect
-                  data-prophover-venue=""
-                  value={field.state.value}
-                  onClick={stop}
-                  onChange={(event) => {
-                    event.preventDefault();
-                    stop(event);
-                    field.handleChange(event.currentTarget.value);
-                  }}
-                >
+                <ToggleRow data-prophover-venue-toggle="">
                   {HIT_RATE_VENUE_FILTER_OPTIONS.map((option) => (
-                    <option key={option.value || "all"} value={option.value}>
+                    <ToggleButton
+                      key={option.value || "all"}
+                      type="button"
+                      data-prophover-venue={option.value || "all"}
+                      $selected={field.state.value === option.value}
+                      aria-pressed={field.state.value === option.value}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        stop(event);
+                        field.handleChange(option.value);
+                      }}
+                    >
                       {option.label}
-                    </option>
+                    </ToggleButton>
                   ))}
-                </FilterSelect>
+                </ToggleRow>
               </FilterLabel>
             )}
           </form.Field>

@@ -80,10 +80,12 @@ export const Summary = styled.div<SummaryProps>`
 
 export const ToggleRow = styled.div`
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.125rem;
   border-radius: ${shadcnTheme.radiusSm};
   background: hsl(240 4.8% 95.9%);
+  max-width: 100%;
 `;
 
 interface ToggleButtonProps {
@@ -119,12 +121,12 @@ export const ToggleButton = styled.button<ToggleButtonProps>`
 
 export const FiltersRow = styled.div`
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
 `;
 
-export const FilterLabel = styled.label`
+export const FilterLabel = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -132,28 +134,6 @@ export const FilterLabel = styled.label`
   font-weight: 500;
   line-height: 1rem;
   color: ${shadcnTheme.mutedForeground};
-`;
-
-export const FilterSelect = styled.select`
-  appearance: none;
-  min-width: 5.5rem;
-  height: 2rem;
-  border: 1px solid ${shadcnTheme.input};
-  background: ${shadcnTheme.background}
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
-    no-repeat right 0.5rem center;
-  color: ${shadcnTheme.foreground};
-  padding: 0 1.75rem 0 0.5rem;
-  border-radius: ${shadcnTheme.radiusSm};
-  font-family: inherit;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid ${shadcnTheme.ring};
-    outline-offset: 2px;
-  }
 `;
 
 export const LineControl = styled.label`
