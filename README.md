@@ -59,7 +59,7 @@ npm run db:migrate
 npm run seed:demo
 ```
 
-Įkelia rungtynių CSV, klientus **A** / **B** ir watchlist eilutes; atnaujina `apps/extension/players.json`.
+Įkelia rungtynių CSV ir klientus **A** / **B** (tušti watchlist’ai); atnaujina `apps/extension/data/players.json`.
 
 **5. Plėtinys Chrome**
 

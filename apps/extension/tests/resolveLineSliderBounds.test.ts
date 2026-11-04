@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   formatLineValue,
   resolveLineSliderBounds,
-} from "./src/components/hitRateCard/utils/resolveLineSliderBounds";
+} from "../src/components/hitRateCard/utils/resolveLineSliderBounds";
 
 describe("resolveLineSliderBounds", () => {
   it("should use slider value 32.5 when the parsed line is 32.5", () => {

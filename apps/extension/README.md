@@ -6,7 +6,7 @@ Chrome Manifest V3 content script for `https://www.betsson.lt/*`. Full prerequis
 
 Looks for player-name + line rows (bundled `players.json`) under a points market header containing `taškai` and not `+` (e.g. **Žaidėjo pelnyti taškai**). Hit-rate requests go through the background service worker to `GET /api/hit-rate`. The hover card is a fixed overlay on `document.body` (last-N, venue, line slider, watchlist star).
 
-Pick **Client A** or **Client B** on the options page. That choice is stored in `chrome.storage.local` (`clientId`) and sent as `X-Client-Id` on watchlist list/add/remove. Switching A/B changes which hover-card stars are filled. After `seed:demo`, A’s watchlist is Nikola Jokic (`203999`) and B’s is Luka Doncic (`1629029`).
+Pick **Client A** or **Client B** on the options page. That choice is stored in `chrome.storage.local` (`clientId`) and sent as `X-Client-Id` on watchlist list/add/remove. Switching A/B changes which hover-card stars are filled. After `seed:demo`, both clients start with empty watchlists — stars fill only after you add players.
 
 ## Setup
 
@@ -44,7 +44,7 @@ Pick **Client A** or **Client B** on the options page. That choice is stored in 
 
 Reload the extension after each build and after `seed:demo` (it rewrites `players.json`).
 
-Unit tests for this package live in `apps/extension/*.test.ts` and run with:
+Unit tests for this package live in `apps/extension/tests/` and run with:
 
 ```bash
 cd apps/web

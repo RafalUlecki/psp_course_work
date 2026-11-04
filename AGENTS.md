@@ -31,7 +31,7 @@
 - **One assertion** per test; no `// Given` / `// When` / `// Then` comments
 - **No real database** in `*.test.ts` — mock ports (e.g. `GameLogReader`). DB + seed only in integration tests with `RUN_DB_TESTS=1`
 - Avoid low-value tests (duplicate `callCount`, redundant `every()` after `idsOf`, per-field seed assertions for passthrough helpers)
-- Run: `cd apps/web && npm test` (`apps/web/src`, `apps/web/app`, and `apps/extension` `*.test.ts` files)
+- Run: `cd apps/web && npm test` (`apps/web/src`, `apps/web/app`, and `apps/extension/tests` `*.test.ts` files)
 
 ### Before opening a PR
 

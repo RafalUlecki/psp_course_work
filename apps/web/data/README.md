@@ -39,7 +39,7 @@ npm run seed:demo
 1. Reads only the committed CSV (no network).
 2. Fails and names the player when a requested `--players` name is not in the CSV.
 3. Upserts `players` by `personId` and game logs by `(playerId, source, sourceGameId)` (idempotent; insert order does not change ids).
-4. Writes `apps/extension/players.json` (normalized name → player id) from the seeded set.
+4. Writes `apps/extension/data/players.json` (normalized name → player id) from the seeded set.
 
 After re-seeding, rebuild and **reload the Chrome extension** so `players.json` cannot drift from the database.
 

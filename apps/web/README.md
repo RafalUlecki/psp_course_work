@@ -23,7 +23,7 @@ npm run lint
 npm run build
 ```
 
-`npm test` is the unit-test command (Node test runner). It must be run from `apps/web` and also picks up `apps/extension/*.test.ts`. It does not need a database.
+`npm test` is the unit-test command (Node test runner). It must be run from `apps/web` and also picks up `apps/extension/tests/**/*.test.ts`. It does not need a database.
 
 ## Database (Prisma + Postgres)
 
@@ -66,6 +66,6 @@ npm run db:migrate
 npm run seed:demo
 ```
 
-That seeds **every** player in the CSV into Postgres and writes the full name→id map to `apps/extension/players.json`. Optional filter: `npm run seed:demo -- --players "Luka Doncic,Austin Reaves"`. Idempotent. After re-seeding, rebuild and **reload the Chrome extension**. Source, licence, and columns: [`data/README.md`](data/README.md).
+That seeds **every** player in the CSV into Postgres and writes the full name→id map to `apps/extension/data/players.json`. Optional filter: `npm run seed:demo -- --players "Luka Doncic,Austin Reaves"`. Idempotent. After re-seeding, rebuild and **reload the Chrome extension**. Source, licence, and columns: [`data/README.md`](data/README.md).
 
-The same command upserts test **Client A** (`A`, Nikola Jokic `203999`) and **Client B** (`B`, Luka Doncic `1629029`) plus one watchlist row each. Watchlist reads/writes are scoped by the `X-Client-Id` header; missing → 400, unknown → 401. Curl examples: [root README](../../README.md#demo).
+The same command upserts test **Client A** (`A`) and **Client B** (`B`) with empty watchlists. Watchlist rows are added only via the API/extension star. Reads/writes are scoped by the `X-Client-Id` header; missing → 400, unknown → 401. Curl examples: [root README](../../README.md#demo).
