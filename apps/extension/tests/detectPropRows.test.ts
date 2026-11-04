@@ -14,8 +14,8 @@ import {
   isProcessed,
   markProcessed,
   matchPlayerAndLine,
-} from "./src/lib/genericProp/detectPropRows";
-import { loadPlayerNameMap } from "./src/lib/genericProp/playerNameMap";
+} from "../src/lib/genericProp/detectPropRows";
+import { loadPlayerNameMap } from "../src/lib/genericProp/playerNameMap";
 
 const SAMPLE_ROW_TEXT =
   "Luka Doncic\nDaugiau 30.5\n1.80\nMažiau 30.5\n1.90";
@@ -24,7 +24,7 @@ const SAMPLE_ROW_TEXT_TRAILING_SPACE =
 
 const playersByNormalizedName = loadPlayerNameMap();
 
-const extensionRoot = dirname(fileURLToPath(import.meta.url));
+const extensionRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 interface ExtensionManifest {
   content_scripts: { matches: string[] }[];

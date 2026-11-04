@@ -1,5 +1,5 @@
 import { normalizePlayerName } from "../../../../web/src/lib/players/normalizePlayerName";
-import playersJson from "../../../players.json";
+import playersJson from "../../../data/players.json";
 
 export { normalizePlayerName };
 

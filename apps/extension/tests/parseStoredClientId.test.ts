@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DEFAULT_CLIENT_ID, TEST_CLIENT_B_ID } from "./constants";
-import { parseStoredClientId } from "./parseStoredClientId";
+import {
+  DEFAULT_CLIENT_ID,
+  TEST_CLIENT_B_ID,
+} from "../src/settings/constants";
+import { parseStoredClientId } from "../src/settings/parseStoredClientId";
 
 describe("parseStoredClientId", () => {
   it("should return the stored client id when it is Client B", () => {

@@ -8,10 +8,6 @@ import {
   TEST_CLIENT_B_ID,
 } from "../src/lib/clients/constants";
 import {
-  pickWatchlistPlayers,
-  type WatchlistPlayerIds,
-} from "../src/lib/clients/pickWatchlistPlayers";
-import {
   DEMO_CSV_RELATIVE_PATH,
   DEMO_CSV_SOURCE,
 } from "../src/lib/demoSeed/constants/demoSeedConstants";
@@ -33,7 +29,10 @@ import { seedTestClients } from "./seedTestClients";
 const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SEED_DIR, "..");
 const DEMO_CSV_PATH = path.resolve(APP_ROOT, DEMO_CSV_RELATIVE_PATH);
-const PLAYERS_JSON_PATH = path.resolve(APP_ROOT, "../extension/players.json");
+const PLAYERS_JSON_PATH = path.resolve(
+  APP_ROOT,
+  "../extension/data/players.json",
+);
 const BATCH_SIZE = 100;
 
 interface SeedDemoCliOptions {
@@ -135,9 +134,7 @@ const parseArgs = (argv: string[]): SeedDemoCliOptions => {
 
 const missingPlayersError = (missing: string[]): Error => {
   if (missing.length === 1) {
-    return new Error(
-      `Player not found in PlayerStatistics.csv: ${missing[0]}`,
-    );
+    return new Error(`Player not found in PlayerStatistics.csv: ${missing[0]}`);
   }
 
   return new Error(
@@ -311,34 +308,14 @@ const loadCsvRows = (): PlayerStatisticsRow[] => {
   return parsePlayerStatisticsCsv(readFileSync(DEMO_CSV_PATH, "utf8"));
 };
 
-const playerLabel = (props: {
-  players: DemoPlayer[];
-  playerId: number;
-}): string => {
-  const { players, playerId } = props;
-  const player = players.find((entry) => entry.id === playerId);
-  if (player === undefined) {
-    return String(playerId);
-  }
-  return `${player.name} (${player.id})`;
-};
-
 const printSummary = (props: {
   seededAll: boolean;
   players: DemoPlayer[];
   inserted: number;
   updated: number;
   removedNonKaggle: number;
-  watchlistPlayerIds: WatchlistPlayerIds;
 }): void => {
-  const {
-    seededAll,
-    players,
-    inserted,
-    updated,
-    removedNonKaggle,
-    watchlistPlayerIds,
-  } = props;
+  const { seededAll, players, inserted, updated, removedNonKaggle } = props;
   console.log(`CSV: ${DEMO_CSV_PATH}`);
   if (seededAll) {
     console.log(`Players: all (${players.length})`);
@@ -353,9 +330,6 @@ const printSummary = (props: {
   console.log(`Game logs updated: ${updated}`);
   console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
   console.log(`Clients upserted: ${TEST_CLIENT_A_ID}, ${TEST_CLIENT_B_ID}`);
-  console.log(
-    `Watchlist: ${TEST_CLIENT_A_ID} -> ${playerLabel({ players, playerId: watchlistPlayerIds.clientAPlayerId })}; ${TEST_CLIENT_B_ID} -> ${playerLabel({ players, playerId: watchlistPlayerIds.clientBPlayerId })}`,
-  );
 };
 
 const main = async (): Promise<void> => {
@@ -389,8 +363,7 @@ const main = async (): Promise<void> => {
     playerIds,
   });
   writePlayersJson(players);
-  const watchlistPlayerIds = pickWatchlistPlayers({ players });
-  await seedTestClients({ db: prisma, playerIds: watchlistPlayerIds });
+  await seedTestClients({ db: prisma });
 
   printSummary({
     seededAll,
@@ -398,7 +371,6 @@ const main = async (): Promise<void> => {
     inserted,
     updated,
     removedNonKaggle,
-    watchlistPlayerIds,
   });
 };
 

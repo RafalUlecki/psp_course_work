@@ -27,7 +27,7 @@ const testFiles = testRoots.flatMap(collectTestFiles);
 
 if (testFiles.length === 0) {
   console.error(
-    "No *.test.ts files found under src/, app/, or apps/extension/",
+    "No *.test.ts files found under apps/web/src, apps/web/app, or apps/extension/tests/",
   );
   process.exit(1);
 }

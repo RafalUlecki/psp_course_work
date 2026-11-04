@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import {
   type HitRateCardResult,
   resolveHitRateCardSummary,
-} from "./src/components/hitRateCard/utils/resolveHitRateCardSummary";
+} from "../src/components/hitRateCard/utils/resolveHitRateCardSummary";
 
 const sampleResult = (
   overrides: Partial<HitRateCardResult> = {},
