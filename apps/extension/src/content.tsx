@@ -1,3 +1,3 @@
-import { startGenericPropHover } from "./components/genericPropHover/GenericPropHoverRoot";
+import { startGenericPropHover } from "./components/genericPropHover/startGenericPropHover";
 
 startGenericPropHover();
