@@ -1,7 +1,8 @@
+import type { RequireAuthSuccess } from "./requireAuth";
 import type { UnauthorizedHttpResult } from "./unauthorizedResult";
 
 export interface HandleAuthRevokeRequestProps {
-  authorizationHeader: string | null;
+  auth: RequireAuthSuccess;
   now?: Date;
 }
 

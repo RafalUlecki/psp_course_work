@@ -1,7 +1,3 @@
-import { prismaAuthTokenStore } from "../auth/prismaAuthTokenStore";
-import type { AuthTokenStore } from "../auth/types/authTokenStore";
-import { unauthorizedResult } from "../auth/unauthorizedResult";
-import { verifyToken } from "../auth/verifyToken";
 import { parseClientIdHeader } from "../clients/parseClientIdHeader";
 import { UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
 import {
@@ -100,24 +96,11 @@ type ResolveWatchlistClientIdResult =
 const resolveWatchlistClientId = async (
   props: HandleWatchlistRequestProps,
   store: WatchlistStore,
-  authStore: AuthTokenStore,
 ): Promise<ResolveWatchlistClientIdResult> => {
-  const { headers, now = new Date(), authRequired = true } = props;
+  const { headers, auth } = props;
 
-  if (authRequired) {
-    const verified = await verifyToken(
-      {
-        authorizationHeader: headers.get("authorization"),
-        now,
-      },
-      authStore,
-    );
-
-    if (!verified.ok) {
-      return { ok: false, result: unauthorizedResult() };
-    }
-
-    return { ok: true, clientId: verified.clientId };
+  if (!auth.skipped) {
+    return { ok: true, clientId: auth.clientId };
   }
 
   const parsedClient = parseClientIdHeader({ headers });
@@ -143,10 +126,9 @@ const resolveWatchlistClientId = async (
 export const handleWatchlistRequest = async (
   props: HandleWatchlistRequestProps,
   store: WatchlistStore = prismaWatchlistStore,
-  authStore: AuthTokenStore = prismaAuthTokenStore,
 ): Promise<WatchlistHttpResult> => {
   const { method, searchParams, bodyText } = props;
-  const resolved = await resolveWatchlistClientId(props, store, authStore);
+  const resolved = await resolveWatchlistClientId(props, store);
 
   if (!resolved.ok) {
     return resolved.result;

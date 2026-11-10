@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createToken } from "../auth/createToken";
-import { UNAUTHORIZED_ERROR } from "../auth/errors";
-import { handleAuthRevokeRequest } from "../auth/handleAuthRevokeRequest";
-import { createMemoryAuthTokenStore } from "../auth/memoryAuthTokenStore";
-import type { AuthTokenStore } from "../auth/types/authTokenStore";
+import type {
+  RequireAuthAuthenticated,
+  RequireAuthSkipped,
+} from "../auth/types/requireAuth";
 import {
   CLIENT_ID_HEADER,
   TEST_CLIENT_A_ID,
@@ -28,11 +27,19 @@ import type {
 const CLIENT_A_PLAYER_ID = 203999;
 const CLIENT_B_PLAYER_ID = 1629029;
 const SHARED_PLAYER_ID = 1630559;
-const NOW = new Date("2026-01-01T00:00:00.000Z");
 
 interface MemoryStoreState {
   items: WatchlistItemRecord[];
 }
+
+const authFor = (clientId: string): RequireAuthAuthenticated => ({
+  ok: true,
+  skipped: false,
+  clientId,
+  tokenHash: `hash-${clientId}`,
+});
+
+const skippedAuth: RequireAuthSkipped = { ok: true, skipped: true };
 
 const createMemoryStore = (props: {
   items?: WatchlistItemRecord[];
@@ -88,43 +95,20 @@ const seededStore = (): WatchlistStore =>
     players: [CLIENT_A_PLAYER_ID, CLIENT_B_PLAYER_ID, SHARED_PLAYER_ID],
   });
 
-const bearerHeaders = (
-  rawToken: string,
-  extra?: Record<string, string>,
-): Headers => {
-  const headers = new Headers(extra);
-  headers.set("Authorization", `Bearer ${rawToken}`);
-  return headers;
-};
-
-const createAuth = async () => {
-  const authStore = createMemoryAuthTokenStore();
-  const tokenA = await createToken(
-    { clientId: TEST_CLIENT_A_ID, now: NOW, ttlDays: 14 },
-    authStore,
-  );
-  const tokenB = await createToken(
-    { clientId: TEST_CLIENT_B_ID, now: NOW, ttlDays: 14 },
-    authStore,
-  );
-  return { authStore, tokenA, tokenB };
-};
-
 const listRequest = (
-  rawToken: string,
+  auth: RequireAuthAuthenticated,
   watchlistStore: WatchlistStore,
-  authStore: AuthTokenStore,
+  extraHeaders?: Record<string, string>,
 ) =>
   handleWatchlistRequest(
     {
       method: "GET",
-      headers: bearerHeaders(rawToken),
+      headers: new Headers(extraHeaders),
       searchParams: new URLSearchParams(),
       bodyText: "",
-      now: NOW,
+      auth,
     },
     watchlistStore,
-    authStore,
   );
 
 const listPlayerIds = (result: WatchlistHttpResult): number[] | null => {
@@ -140,106 +124,37 @@ const errorMessage = (result: WatchlistHttpResult): string | null =>
     : null;
 
 describe("handleWatchlistRequest", () => {
-  it("should return 401 when the Authorization header is missing", async () => {
-    const { authStore } = await createAuth();
-    const result = await handleWatchlistRequest(
-      {
-        method: "GET",
-        headers: new Headers(),
-        searchParams: new URLSearchParams(),
-        bodyText: "",
-        now: NOW,
-      },
-      seededStore(),
-      authStore,
-    );
-
-    assert.equal(result.status, 401);
-  });
-
-  it("should return unauthorized when the Authorization header is missing", async () => {
-    const { authStore } = await createAuth();
-    const result = await handleWatchlistRequest(
-      {
-        method: "GET",
-        headers: new Headers(),
-        searchParams: new URLSearchParams(),
-        bodyText: "",
-        now: NOW,
-      },
-      seededStore(),
-      authStore,
-    );
-
-    assert.equal(errorMessage(result), UNAUTHORIZED_ERROR);
-  });
-
-  it("should return 401 when the bearer token is unknown", async () => {
-    const { authStore } = await createAuth();
-    const result = await listRequest(
-      "unknown-token",
-      seededStore(),
-      authStore,
-    );
-
-    assert.equal(result.status, 401);
-  });
-
-  it("should return unauthorized when the bearer token is unknown", async () => {
-    const { authStore } = await createAuth();
-    const result = await listRequest(
-      "unknown-token",
-      seededStore(),
-      authStore,
-    );
-
-    assert.equal(errorMessage(result), UNAUTHORIZED_ERROR);
-  });
-
   it("should return only client A player ids when listing with A's token", async () => {
-    const { authStore, tokenA } = await createAuth();
-    const result = await listRequest(tokenA, seededStore(), authStore);
+    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
   it("should return only client B player ids when listing with B's token", async () => {
-    const { authStore, tokenB } = await createAuth();
-    const result = await listRequest(tokenB, seededStore(), authStore);
+    const result = await listRequest(authFor(TEST_CLIENT_B_ID), seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
 
   it("should ignore X-Client-Id when a token is present", async () => {
-    const { authStore, tokenA } = await createAuth();
-    const result = await handleWatchlistRequest(
-      {
-        method: "GET",
-        headers: bearerHeaders(tokenA, { [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID }),
-        searchParams: new URLSearchParams(),
-        bodyText: "",
-        now: NOW,
-      },
-      seededStore(),
-      authStore,
-    );
+    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore(), {
+      [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID,
+    });
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
   it("should create a watchlist row for client A when A posts a player id", async () => {
     const store = seededStore();
-    const { authStore, tokenA } = await createAuth();
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: bearerHeaders(tokenA),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        now: NOW,
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
-      authStore,
     );
 
     assert.deepEqual(result, {
@@ -250,62 +165,55 @@ describe("handleWatchlistRequest", () => {
 
   it("should keep client B player ids when client A adds a player", async () => {
     const store = seededStore();
-    const { authStore, tokenA, tokenB } = await createAuth();
     await handleWatchlistRequest(
       {
         method: "POST",
-        headers: bearerHeaders(tokenA),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        now: NOW,
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
-      authStore,
     );
     const result = await handleWatchlistRequest(
       {
         method: "GET",
-        headers: bearerHeaders(tokenB),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        now: NOW,
+        auth: authFor(TEST_CLIENT_B_ID),
       },
       store,
-      authStore,
     );
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
 
   it("should return 400 when POST has no playerId", async () => {
-    const { authStore, tokenA } = await createAuth();
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: bearerHeaders(tokenA),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "{}",
-        now: NOW,
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       seededStore(),
-      authStore,
     );
 
     assert.equal(errorMessage(result), MISSING_PLAYER_ID_ERROR);
   });
 
   it("should return a player-not-found error when POST playerId is unknown", async () => {
-    const { authStore, tokenA } = await createAuth();
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: bearerHeaders(tokenA),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: 1 }),
-        now: NOW,
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       seededStore(),
-      authStore,
     );
 
     assert.equal(errorMessage(result), PLAYER_NOT_FOUND_ERROR);
@@ -313,47 +221,30 @@ describe("handleWatchlistRequest", () => {
 
   it("should keep client B items when client A deletes a watchlist player", async () => {
     const store = seededStore();
-    const { authStore, tokenA, tokenB } = await createAuth();
     await handleWatchlistRequest(
       {
         method: "DELETE",
-        headers: bearerHeaders(tokenA),
+        headers: new Headers(),
         searchParams: new URLSearchParams({
           playerId: String(CLIENT_A_PLAYER_ID),
         }),
         bodyText: "",
-        now: NOW,
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
-      authStore,
     );
     const result = await handleWatchlistRequest(
       {
         method: "GET",
-        headers: bearerHeaders(tokenB),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        now: NOW,
+        auth: authFor(TEST_CLIENT_B_ID),
       },
       store,
-      authStore,
     );
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
-  });
-
-  it("should return 401 on a repeat request after the token is revoked", async () => {
-    const { authStore, tokenA } = await createAuth();
-    await handleAuthRevokeRequest(
-      { authorizationHeader: `Bearer ${tokenA}`, now: NOW },
-      authStore,
-    );
-    const result = await listRequest(tokenA, seededStore(), authStore);
-
-    assert.deepEqual(result, {
-      status: 401,
-      body: { error: UNAUTHORIZED_ERROR },
-    });
   });
 
   it("should return 400 when auth is not required and X-Client-Id is missing", async () => {
@@ -363,11 +254,9 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        now: NOW,
-        authRequired: false,
+        auth: skippedAuth,
       },
       seededStore(),
-      createMemoryAuthTokenStore(),
     );
 
     assert.deepEqual(result, {
@@ -383,11 +272,9 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        now: NOW,
-        authRequired: false,
+        auth: skippedAuth,
       },
       seededStore(),
-      createMemoryAuthTokenStore(),
     );
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);

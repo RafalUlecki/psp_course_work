@@ -1,4 +1,4 @@
-import { isAuthRequired } from "@/src/lib/auth/parseAuthRequired";
+import { isRequireAuthOk, requireAuth } from "@/src/lib/auth/requireAuth";
 import { CLIENT_ID_HEADER } from "@/src/lib/clients/constants";
 import { handleWatchlistRequest } from "@/src/lib/watchlist/handleWatchlistRequest";
 
@@ -9,13 +9,27 @@ const watchlistCorsHeaders = {
 };
 
 const jsonResult = async (request: Request): Promise<Response> => {
+  const url = new URL(request.url);
+  const auth = await requireAuth({
+    authorizationHeader: request.headers.get("authorization"),
+    now: new Date(),
+    method: request.method,
+    pathname: url.pathname,
+  });
+
+  if (!isRequireAuthOk(auth)) {
+    return Response.json(auth.body, {
+      status: auth.status,
+      headers: watchlistCorsHeaders,
+    });
+  }
+
   const result = await handleWatchlistRequest({
     method: request.method,
     headers: request.headers,
-    searchParams: new URL(request.url).searchParams,
+    searchParams: url.searchParams,
     bodyText: await request.text(),
-    now: new Date(),
-    authRequired: isAuthRequired(),
+    auth,
   });
 
   return Response.json(result.body, {
