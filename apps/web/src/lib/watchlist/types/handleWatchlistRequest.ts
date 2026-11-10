@@ -3,4 +3,6 @@ export interface HandleWatchlistRequestProps {
   headers: Headers;
   searchParams: URLSearchParams;
   bodyText: string;
+  now?: Date;
+  authRequired?: boolean;
 }

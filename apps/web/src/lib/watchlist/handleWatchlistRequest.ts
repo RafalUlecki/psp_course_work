@@ -1,3 +1,7 @@
+import { prismaAuthTokenStore } from "../auth/prismaAuthTokenStore";
+import type { AuthTokenStore } from "../auth/types/authTokenStore";
+import { unauthorizedResult } from "../auth/unauthorizedResult";
+import { verifyToken } from "../auth/verifyToken";
 import { parseClientIdHeader } from "../clients/parseClientIdHeader";
 import { UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
 import {
@@ -79,32 +83,87 @@ const removeForClient = async (
   };
 };
 
-export const handleWatchlistRequest = async (
+interface ResolvedWatchlistClient {
+  ok: true;
+  clientId: string;
+}
+
+interface UnresolvedWatchlistClient {
+  ok: false;
+  result: WatchlistHttpResult;
+}
+
+type ResolveWatchlistClientIdResult =
+  | ResolvedWatchlistClient
+  | UnresolvedWatchlistClient;
+
+const resolveWatchlistClientId = async (
   props: HandleWatchlistRequestProps,
-  store: WatchlistStore = prismaWatchlistStore,
-): Promise<WatchlistHttpResult> => {
-  const { method, headers, searchParams, bodyText } = props;
+  store: WatchlistStore,
+  authStore: AuthTokenStore,
+): Promise<ResolveWatchlistClientIdResult> => {
+  const { headers, now = new Date(), authRequired = true } = props;
+
+  if (authRequired) {
+    const verified = await verifyToken(
+      {
+        authorizationHeader: headers.get("authorization"),
+        now,
+      },
+      authStore,
+    );
+
+    if (!verified.ok) {
+      return { ok: false, result: unauthorizedResult() };
+    }
+
+    return { ok: true, clientId: verified.clientId };
+  }
+
   const parsedClient = parseClientIdHeader({ headers });
 
   if (!parsedClient.ok) {
-    return { status: 400, body: { error: parsedClient.error } };
+    return {
+      ok: false,
+      result: { status: 400, body: { error: parsedClient.error } },
+    };
   }
 
   const client = await store.findClientById(parsedClient.clientId);
   if (client === null) {
-    return { status: 401, body: { error: UNKNOWN_CLIENT_ID_ERROR } };
+    return {
+      ok: false,
+      result: { status: 401, body: { error: UNKNOWN_CLIENT_ID_ERROR } },
+    };
   }
 
+  return { ok: true, clientId: client.id };
+};
+
+export const handleWatchlistRequest = async (
+  props: HandleWatchlistRequestProps,
+  store: WatchlistStore = prismaWatchlistStore,
+  authStore: AuthTokenStore = prismaAuthTokenStore,
+): Promise<WatchlistHttpResult> => {
+  const { method, searchParams, bodyText } = props;
+  const resolved = await resolveWatchlistClientId(props, store, authStore);
+
+  if (!resolved.ok) {
+    return resolved.result;
+  }
+
+  const { clientId } = resolved;
+
   if (method === "GET") {
-    return listForClient(client.id, store);
+    return listForClient(clientId, store);
   }
 
   if (method === "POST") {
-    return addForClient({ clientId: client.id, bodyText }, store);
+    return addForClient({ clientId, bodyText }, store);
   }
 
   if (method === "DELETE") {
-    return removeForClient({ clientId: client.id, searchParams }, store);
+    return removeForClient({ clientId, searchParams }, store);
   }
 
   return { status: 405, body: { error: METHOD_NOT_ALLOWED_ERROR } };

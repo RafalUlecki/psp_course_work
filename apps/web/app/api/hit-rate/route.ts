@@ -1,8 +1,10 @@
-import { getHitRate } from "@/src/lib/hitRate/getHitRate";
+import { isAuthRequired } from "@/src/lib/auth/parseAuthRequired";
+import { handleHitRateRequest } from "@/src/lib/hitRate/handleHitRateRequest";
 
 const hitRateCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization",
 };
 
 export const OPTIONS = async (): Promise<Response> =>
@@ -10,7 +12,12 @@ export const OPTIONS = async (): Promise<Response> =>
 
 export const GET = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
-  const result = await getHitRate({ searchParams: url.searchParams });
+  const result = await handleHitRateRequest({
+    authorizationHeader: request.headers.get("authorization"),
+    searchParams: url.searchParams,
+    now: new Date(),
+    authRequired: isAuthRequired(),
+  });
 
   return Response.json(result.body, {
     status: result.status,

@@ -1,10 +1,11 @@
+import { isAuthRequired } from "@/src/lib/auth/parseAuthRequired";
 import { CLIENT_ID_HEADER } from "@/src/lib/clients/constants";
 import { handleWatchlistRequest } from "@/src/lib/watchlist/handleWatchlistRequest";
 
 const watchlistCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": `${CLIENT_ID_HEADER}, Content-Type`,
+  "Access-Control-Allow-Headers": `${CLIENT_ID_HEADER}, Authorization, Content-Type`,
 };
 
 const jsonResult = async (request: Request): Promise<Response> => {
@@ -13,6 +14,8 @@ const jsonResult = async (request: Request): Promise<Response> => {
     headers: request.headers,
     searchParams: new URL(request.url).searchParams,
     bodyText: await request.text(),
+    now: new Date(),
+    authRequired: isAuthRequired(),
   });
 
   return Response.json(result.body, {
