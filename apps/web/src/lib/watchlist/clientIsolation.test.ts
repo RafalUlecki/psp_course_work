@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { RequireAuthAuthenticated } from "../auth/types/requireAuth";
 import {
-  CLIENT_ID_HEADER,
   TEST_CLIENT_A_ID,
   TEST_CLIENT_A_NAME,
   TEST_CLIENT_B_ID,
   TEST_CLIENT_B_NAME,
 } from "../clients/constants";
-import { MISSING_CLIENT_ID_ERROR, UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
 import { handleWatchlistRequest } from "./handleWatchlistRequest";
 import type { WatchlistHttpResult } from "./types/api";
 import type {
@@ -31,10 +30,17 @@ interface WatchlistListSnapshot {
 
 interface CallWatchlistProps {
   method: string;
-  clientId?: string;
+  auth: RequireAuthAuthenticated;
   playerId?: number;
   store: WatchlistStore;
 }
+
+const authFor = (clientId: string): RequireAuthAuthenticated => ({
+  ok: true,
+  skipped: false,
+  clientId,
+  tokenHash: `hash-${clientId}`,
+});
 
 const createMemoryStore = (props: {
   items?: WatchlistItemRecord[];
@@ -90,12 +96,7 @@ const isolationStore = (): WatchlistStore =>
 const callWatchlist = (
   props: CallWatchlistProps,
 ): Promise<WatchlistHttpResult> => {
-  const { method, clientId, playerId, store } = props;
-  const headers = new Headers();
-  if (clientId !== undefined) {
-    headers.set(CLIENT_ID_HEADER, clientId);
-  }
-
+  const { method, auth, playerId, store } = props;
   const searchParams = new URLSearchParams();
   const isDelete = method === "DELETE" && playerId !== undefined;
   if (isDelete) {
@@ -108,7 +109,13 @@ const callWatchlist = (
       : "";
 
   return handleWatchlistRequest(
-    { method, headers, searchParams, bodyText },
+    {
+      method,
+      headers: new Headers(),
+      searchParams,
+      bodyText,
+      auth,
+    },
     store,
   );
 };
@@ -117,7 +124,7 @@ const starPlayersAsA = async (store: WatchlistStore): Promise<void> => {
   for (const playerId of CLIENT_A_PLAYER_IDS) {
     await callWatchlist({
       method: "POST",
-      clientId: TEST_CLIENT_A_ID,
+      auth: authFor(TEST_CLIENT_A_ID),
       playerId,
       store,
     });
@@ -137,7 +144,7 @@ const deleteAPlayersAsB = (
     CLIENT_A_PLAYER_IDS.map((playerId) =>
       callWatchlist({
         method: "DELETE",
-        clientId: TEST_CLIENT_B_ID,
+        auth: authFor(TEST_CLIENT_B_ID),
         playerId,
         store,
       }),
@@ -166,7 +173,7 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     const result = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_A_ID,
+      auth: authFor(TEST_CLIENT_A_ID),
       store,
     });
 
@@ -181,7 +188,7 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     const result = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_B_ID,
+      auth: authFor(TEST_CLIENT_B_ID),
       store,
     });
     const snapshot = listSnapshot(result);
@@ -207,7 +214,7 @@ describe("watchlist client isolation", () => {
     await deleteAPlayersAsB(store);
     const result = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_A_ID,
+      auth: authFor(TEST_CLIENT_A_ID),
       store,
     });
 
@@ -223,7 +230,7 @@ describe("watchlist client isolation", () => {
     const deleteResults = await deleteAPlayersAsB(store);
     const listResult = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_B_ID,
+      auth: authFor(TEST_CLIENT_B_ID),
       store,
     });
     const list = listSnapshot(listResult);
@@ -254,13 +261,13 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     await callWatchlist({
       method: "POST",
-      clientId: TEST_CLIENT_B_ID,
+      auth: authFor(TEST_CLIENT_B_ID),
       playerId: CLIENT_A_FIRST_PLAYER_ID,
       store,
     });
     const result = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_A_ID,
+      auth: authFor(TEST_CLIENT_A_ID),
       store,
     });
 
@@ -275,43 +282,19 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     await callWatchlist({
       method: "POST",
-      clientId: TEST_CLIENT_B_ID,
+      auth: authFor(TEST_CLIENT_B_ID),
       playerId: CLIENT_A_FIRST_PLAYER_ID,
       store,
     });
     const result = await callWatchlist({
       method: "GET",
-      clientId: TEST_CLIENT_B_ID,
+      auth: authFor(TEST_CLIENT_B_ID),
       store,
     });
     assert.deepEqual(listSnapshot(result), {
       status: 200,
       clientId: TEST_CLIENT_B_ID,
       playerIds: [CLIENT_A_FIRST_PLAYER_ID],
-    });
-  });
-
-  it("should return 400 when X-Client-Id is missing", async () => {
-    const store = await storeWithClientAStarred();
-    const result = await callWatchlist({ method: "GET", store });
-
-    assert.deepEqual(result, {
-      status: 400,
-      body: { error: MISSING_CLIENT_ID_ERROR },
-    });
-  });
-
-  it("should return 401 when X-Client-Id is unknown", async () => {
-    const store = await storeWithClientAStarred();
-    const result = await callWatchlist({
-      method: "GET",
-      clientId: "Z",
-      store,
-    });
-
-    assert.deepEqual(result, {
-      status: 401,
-      body: { error: UNKNOWN_CLIENT_ID_ERROR },
     });
   });
 });

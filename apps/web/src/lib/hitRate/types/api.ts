@@ -45,7 +45,7 @@ export interface HitRateSuccessHttpResult {
 }
 
 export interface HitRateErrorHttpResult {
-  status: 400;
+  status: 400 | 401;
   body: HitRateErrorResponse;
 }
 

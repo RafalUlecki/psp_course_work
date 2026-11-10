@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type {
+  RequireAuthAuthenticated,
+  RequireAuthSkipped,
+} from "../auth/types/requireAuth";
 import {
   CLIENT_ID_HEADER,
   TEST_CLIENT_A_ID,
@@ -8,7 +12,7 @@ import {
   TEST_CLIENT_B_ID,
   TEST_CLIENT_B_NAME,
 } from "../clients/constants";
-import { MISSING_CLIENT_ID_ERROR, UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
+import { MISSING_CLIENT_ID_ERROR } from "../clients/errors";
 import { handleWatchlistRequest } from "./handleWatchlistRequest";
 import {
   MISSING_PLAYER_ID_ERROR,
@@ -27,6 +31,15 @@ const SHARED_PLAYER_ID = 1630559;
 interface MemoryStoreState {
   items: WatchlistItemRecord[];
 }
+
+const authFor = (clientId: string): RequireAuthAuthenticated => ({
+  ok: true,
+  skipped: false,
+  clientId,
+  tokenHash: `hash-${clientId}`,
+});
+
+const skippedAuth: RequireAuthSkipped = { ok: true, skipped: true };
 
 const createMemoryStore = (props: {
   items?: WatchlistItemRecord[];
@@ -82,15 +95,20 @@ const seededStore = (): WatchlistStore =>
     players: [CLIENT_A_PLAYER_ID, CLIENT_B_PLAYER_ID, SHARED_PLAYER_ID],
   });
 
-const listRequest = (clientId: string) =>
+const listRequest = (
+  auth: RequireAuthAuthenticated,
+  watchlistStore: WatchlistStore,
+  extraHeaders?: Record<string, string>,
+) =>
   handleWatchlistRequest(
     {
       method: "GET",
-      headers: new Headers({ [CLIENT_ID_HEADER]: clientId }),
+      headers: new Headers(extraHeaders),
       searchParams: new URLSearchParams(),
       bodyText: "",
+      auth,
     },
-    seededStore(),
+    watchlistStore,
   );
 
 const listPlayerIds = (result: WatchlistHttpResult): number[] | null => {
@@ -106,56 +124,24 @@ const errorMessage = (result: WatchlistHttpResult): string | null =>
     : null;
 
 describe("handleWatchlistRequest", () => {
-  it("should return 400 when X-Client-Id is missing", async () => {
-    const result = await handleWatchlistRequest(
-      {
-        method: "GET",
-        headers: new Headers(),
-        searchParams: new URLSearchParams(),
-        bodyText: "",
-      },
-      seededStore(),
-    );
-
-    assert.equal(result.status, 400);
-  });
-
-  it("should return a missing-header error when X-Client-Id is missing", async () => {
-    const result = await handleWatchlistRequest(
-      {
-        method: "GET",
-        headers: new Headers(),
-        searchParams: new URLSearchParams(),
-        bodyText: "",
-      },
-      seededStore(),
-    );
-
-    assert.equal(errorMessage(result), MISSING_CLIENT_ID_ERROR);
-  });
-
-  it("should return 401 when X-Client-Id is unknown", async () => {
-    const result = await listRequest("Z");
-
-    assert.equal(result.status, 401);
-  });
-
-  it("should return an unknown-client error when X-Client-Id is unknown", async () => {
-    const result = await listRequest("Z");
-
-    assert.equal(errorMessage(result), UNKNOWN_CLIENT_ID_ERROR);
-  });
-
-  it("should return only client A player ids when listing as A", async () => {
-    const result = await listRequest(TEST_CLIENT_A_ID);
+  it("should return only client A player ids when listing with A's token", async () => {
+    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
-  it("should return only client B player ids when listing as B", async () => {
-    const result = await listRequest(TEST_CLIENT_B_ID);
+  it("should return only client B player ids when listing with B's token", async () => {
+    const result = await listRequest(authFor(TEST_CLIENT_B_ID), seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
+  });
+
+  it("should ignore X-Client-Id when a token is present", async () => {
+    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore(), {
+      [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID,
+    });
+
+    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
   it("should create a watchlist row for client A when A posts a player id", async () => {
@@ -163,9 +149,10 @@ describe("handleWatchlistRequest", () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
     );
@@ -181,18 +168,20 @@ describe("handleWatchlistRequest", () => {
     await handleWatchlistRequest(
       {
         method: "POST",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
     );
     const result = await handleWatchlistRequest(
       {
         method: "GET",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
+        auth: authFor(TEST_CLIENT_B_ID),
       },
       store,
     );
@@ -204,9 +193,10 @@ describe("handleWatchlistRequest", () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "{}",
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       seededStore(),
     );
@@ -218,9 +208,10 @@ describe("handleWatchlistRequest", () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: 1 }),
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       seededStore(),
     );
@@ -233,24 +224,59 @@ describe("handleWatchlistRequest", () => {
     await handleWatchlistRequest(
       {
         method: "DELETE",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams({
           playerId: String(CLIENT_A_PLAYER_ID),
         }),
         bodyText: "",
+        auth: authFor(TEST_CLIENT_A_ID),
       },
       store,
     );
     const result = await handleWatchlistRequest(
       {
         method: "GET",
-        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID }),
+        headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
+        auth: authFor(TEST_CLIENT_B_ID),
       },
       store,
     );
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
+  });
+
+  it("should return 400 when auth is not required and X-Client-Id is missing", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "GET",
+        headers: new Headers(),
+        searchParams: new URLSearchParams(),
+        bodyText: "",
+        auth: skippedAuth,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(result, {
+      status: 400,
+      body: { error: MISSING_CLIENT_ID_ERROR },
+    });
+  });
+
+  it("should list by X-Client-Id when auth is not required", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "GET",
+        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID }),
+        searchParams: new URLSearchParams(),
+        bodyText: "",
+        auth: skippedAuth,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 });
