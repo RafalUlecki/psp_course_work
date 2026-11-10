@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { RequireAuthAuthenticated } from "../auth/types/requireAuth";
+import type { UserRole } from "../auth/types/userRole";
 import {
   TEST_CLIENT_A_ID,
   TEST_CLIENT_A_NAME,
@@ -35,11 +36,16 @@ interface CallWatchlistProps {
   store: WatchlistStore;
 }
 
-const authFor = (clientId: string): RequireAuthAuthenticated => ({
+const authFor = (
+  clientId: string,
+  role: UserRole = "admin",
+): RequireAuthAuthenticated => ({
   ok: true,
   skipped: false,
+  userId: `user-${clientId}-${role}`,
   clientId,
-  tokenHash: `hash-${clientId}`,
+  role,
+  tokenHash: `hash-${clientId}-${role}`,
 });
 
 const createMemoryStore = (props: {
@@ -68,6 +74,8 @@ const createMemoryStore = (props: {
       state.items.find(
         (item) => item.clientId === clientId && item.playerId === playerId,
       ) ?? null,
+    findItemById: async (id) =>
+      state.items.find((item) => item.id === id) ?? null,
     createItem: async (clientId, playerId) => {
       const item = { id: nextId, clientId, playerId };
       nextId += 1;
@@ -77,6 +85,16 @@ const createMemoryStore = (props: {
     deleteItem: async (clientId, playerId) => {
       const index = state.items.findIndex(
         (item) => item.clientId === clientId && item.playerId === playerId,
+      );
+      if (index === -1) {
+        return false;
+      }
+      state.items.splice(index, 1);
+      return true;
+    },
+    deleteItemById: async (id, clientId) => {
+      const index = state.items.findIndex(
+        (item) => item.id === id && item.clientId === clientId,
       );
       if (index === -1) {
         return false;

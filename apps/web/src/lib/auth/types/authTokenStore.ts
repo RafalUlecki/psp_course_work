@@ -1,5 +1,6 @@
 export interface AuthTokenRecord {
   id: string;
+  userId: string;
   clientId: string;
   tokenHash: string;
   createdAt: Date;

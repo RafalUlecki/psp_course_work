@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { randomUUID } from "node:crypto";
+
 import { TEST_CLIENT_A_ID } from "../clients/constants";
 import { createToken } from "./createToken";
 import { UNAUTHORIZED_ERROR } from "./errors";
 import { handleAuthRevokeRequest } from "./handleAuthRevokeRequest";
 import { createMemoryAuthTokenStore } from "./memoryAuthTokenStore";
+import { createMemoryUserStore } from "./memoryUserStore";
+import { hashPassword } from "./passwordHash";
 import { isRequireAuthOk, requireAuth } from "./requireAuth";
 import type { RequireAuthSkipped } from "./types/requireAuth";
 import { verifyToken } from "./verifyToken";
@@ -18,8 +22,16 @@ const skippedAuth: RequireAuthSkipped = { ok: true, skipped: true };
 
 const createAuthenticated = async () => {
   const store = createMemoryAuthTokenStore();
+  const userStore = createMemoryUserStore();
+  const user = await userStore.insert({
+    id: randomUUID(),
+    email: "admin-a@test.local",
+    passwordHash: await hashPassword({ password: "password" }),
+    clientId: TEST_CLIENT_A_ID,
+    role: "admin",
+  });
   const rawToken = await createToken(
-    { clientId: TEST_CLIENT_A_ID, now: NOW, ttlDays: 14 },
+    { userId: user.id, clientId: user.clientId, now: NOW, ttlDays: 14 },
     store,
   );
   const auth = await requireAuth(
@@ -29,11 +41,12 @@ const createAuthenticated = async () => {
       authRequired: true,
     },
     store,
+    userStore,
   );
   if (!isRequireAuthOk(auth) || auth.skipped) {
     throw new Error("expected a valid token");
   }
-  return { store, rawToken, auth };
+  return { store, userStore, rawToken, auth };
 };
 
 describe("handleAuthRevokeRequest", () => {
@@ -68,7 +81,7 @@ describe("handleAuthRevokeRequest", () => {
   });
 
   it("should return 401 when requireAuth runs again with the revoked token", async () => {
-    const { store, rawToken, auth } = await createAuthenticated();
+    const { store, userStore, rawToken, auth } = await createAuthenticated();
     await handleAuthRevokeRequest({ auth, now: NOW }, store);
     const result = await requireAuth(
       {
@@ -77,6 +90,7 @@ describe("handleAuthRevokeRequest", () => {
         authRequired: true,
       },
       store,
+      userStore,
     );
 
     assert.deepEqual(result, {

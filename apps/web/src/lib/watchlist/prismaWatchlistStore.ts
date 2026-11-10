@@ -25,6 +25,11 @@ export const prismaWatchlistStore: WatchlistStore = {
       where: { clientId_playerId: { clientId, playerId } },
       select: { id: true, clientId: true, playerId: true },
     }),
+  findItemById: (id) =>
+    prisma.watchlistItem.findUnique({
+      where: { id },
+      select: { id: true, clientId: true, playerId: true },
+    }),
   createItem: (clientId, playerId) =>
     prisma.watchlistItem.create({
       data: { clientId, playerId },
@@ -33,6 +38,12 @@ export const prismaWatchlistStore: WatchlistStore = {
   deleteItem: async (clientId, playerId) => {
     const result = await prisma.watchlistItem.deleteMany({
       where: { clientId, playerId },
+    });
+    return result.count > 0;
+  },
+  deleteItemById: async (id, clientId) => {
+    const result = await prisma.watchlistItem.deleteMany({
+      where: { id, clientId },
     });
     return result.count > 0;
   },

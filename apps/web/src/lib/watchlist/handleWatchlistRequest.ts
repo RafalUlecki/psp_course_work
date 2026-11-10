@@ -1,10 +1,14 @@
+import { forbiddenResult } from "../auth/forbiddenResult";
+import { isAdminAuth } from "../auth/isAdminAuth";
 import { parseClientIdHeader } from "../clients/parseClientIdHeader";
 import { UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
 import {
   METHOD_NOT_ALLOWED_ERROR,
   PLAYER_NOT_FOUND_ERROR,
+  WATCHLIST_ITEM_NOT_FOUND_ERROR,
 } from "./errors";
 import { prismaWatchlistStore } from "./prismaWatchlistStore";
+import { parseWatchlistItemIdQuery } from "./query/parseWatchlistItemId";
 import {
   parseWatchlistPlayerIdBody,
   parseWatchlistPlayerIdQuery,
@@ -23,7 +27,37 @@ const listForClient = async (
     status: 200,
     body: {
       clientId,
-      items: rows.map((row) => ({ playerId: row.playerId })),
+      items: rows.map((row) => ({ id: row.id, playerId: row.playerId })),
+    },
+  };
+};
+
+const getItemForClient = async (
+  props: { clientId: string; searchParams: URLSearchParams },
+  store: WatchlistStore,
+): Promise<WatchlistHttpResult> => {
+  const { clientId, searchParams } = props;
+  const parsed = parseWatchlistItemIdQuery({ searchParams });
+
+  if (!parsed.ok) {
+    return { status: 400, body: { error: parsed.error } };
+  }
+
+  const item = await store.findItemById(parsed.id);
+  if (item === null) {
+    return { status: 404, body: { error: WATCHLIST_ITEM_NOT_FOUND_ERROR } };
+  }
+
+  if (item.clientId !== clientId) {
+    return forbiddenResult();
+  }
+
+  return {
+    status: 200,
+    body: {
+      clientId: item.clientId,
+      id: item.id,
+      playerId: item.playerId,
     },
   };
 };
@@ -48,19 +82,19 @@ const addForClient = async (
   if (existing !== null) {
     return {
       status: 200,
-      body: { clientId, playerId: parsed.playerId },
+      body: { clientId, playerId: parsed.playerId, id: existing.id },
     };
   }
 
-  await store.createItem(clientId, parsed.playerId);
+  const created = await store.createItem(clientId, parsed.playerId);
 
   return {
     status: 201,
-    body: { clientId, playerId: parsed.playerId },
+    body: { clientId, playerId: parsed.playerId, id: created.id },
   };
 };
 
-const removeForClient = async (
+const removeByPlayerId = async (
   props: { clientId: string; searchParams: URLSearchParams },
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
@@ -76,6 +110,34 @@ const removeForClient = async (
   return {
     status: 200,
     body: { clientId, playerId: parsed.playerId },
+  };
+};
+
+const removeByItemId = async (
+  props: { clientId: string; searchParams: URLSearchParams },
+  store: WatchlistStore,
+): Promise<WatchlistHttpResult> => {
+  const { clientId, searchParams } = props;
+  const parsed = parseWatchlistItemIdQuery({ searchParams });
+
+  if (!parsed.ok) {
+    return { status: 400, body: { error: parsed.error } };
+  }
+
+  const item = await store.findItemById(parsed.id);
+  if (item === null) {
+    return { status: 404, body: { error: WATCHLIST_ITEM_NOT_FOUND_ERROR } };
+  }
+
+  if (item.clientId !== clientId) {
+    return forbiddenResult();
+  }
+
+  await store.deleteItemById(item.id, clientId);
+
+  return {
+    status: 200,
+    body: { clientId, id: item.id, playerId: item.playerId },
   };
 };
 
@@ -127,7 +189,7 @@ export const handleWatchlistRequest = async (
   props: HandleWatchlistRequestProps,
   store: WatchlistStore = prismaWatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { method, searchParams, bodyText } = props;
+  const { method, searchParams, bodyText, auth } = props;
   const resolved = await resolveWatchlistClientId(props, store);
 
   if (!resolved.ok) {
@@ -137,15 +199,27 @@ export const handleWatchlistRequest = async (
   const { clientId } = resolved;
 
   if (method === "GET") {
+    if (searchParams.get("id") !== null) {
+      return getItemForClient({ clientId, searchParams }, store);
+    }
     return listForClient(clientId, store);
   }
 
   if (method === "POST") {
+    if (!isAdminAuth(auth)) {
+      return forbiddenResult();
+    }
     return addForClient({ clientId, bodyText }, store);
   }
 
   if (method === "DELETE") {
-    return removeForClient({ clientId, searchParams }, store);
+    if (!isAdminAuth(auth)) {
+      return forbiddenResult();
+    }
+    if (searchParams.get("id") !== null) {
+      return removeByItemId({ clientId, searchParams }, store);
+    }
+    return removeByPlayerId({ clientId, searchParams }, store);
   }
 
   return { status: 405, body: { error: METHOD_NOT_ALLOWED_ERROR } };

@@ -1,6 +1,6 @@
 # PropHover
 
-Chrome plėtinys + Next.js API: ant **betsson.lt** NBA taškų eilutės užvedus pelę matote **hit rate** (kiek rungtynių statistika buvo **virš** linijos) pagal filtrus ir slankiklį. Rungtynių duomenys — Postgres (demo CSV); watchlist — du testiniai klientai **A** / **B** (`X-Client-Id`, be prisijungimo).
+Chrome plėtinys + Next.js API: ant **betsson.lt** NBA taškų eilutės užvedus pelę matote **hit rate** (kiek rungtynių statistika buvo **virš** linijos) pagal filtrus ir slankiklį. Rungtynių duomenys — Postgres (demo CSV); watchlist ir kiti privatūs API — du testiniai klientai **A** / **B**, tapatybė iš prisijungimo žetono (`POST /api/auth/login`).
 
 **Stack (dev):** Node 20 · Next 16 · React 19 · Postgres 16 · Prisma 6 · Chrome MV3 · Vite 6
 
@@ -59,7 +59,14 @@ npm run db:migrate
 npm run seed:demo
 ```
 
-Įkelia rungtynių CSV ir klientus **A** / **B** (tušti watchlist’ai); atnaujina `apps/extension/data/players.json`.
+Įkelia rungtynių CSV, klientus **A** / **B** (tušti watchlist’ai) ir keturis dev vartotojus (admin + member kiekvienam klientui); atnaujina `apps/extension/data/players.json`. Slaptažodžiai saugomi tik kaip `scrypt` hash. Dev prisijungimai:
+
+| Email | Slaptažodis | Klientas | Rolė |
+|-------|-------------|----------|------|
+| `admin-a@prophover.local` | `password-admin-a` | A | admin |
+| `member-a@prophover.local` | `password-member-a` | A | member |
+| `admin-b@prophover.local` | `password-admin-b` | B | admin |
+| `member-b@prophover.local` | `password-member-b` | B | member |
 
 **5. Plėtinys Chrome**
 
@@ -105,12 +112,49 @@ Produkcinis web (be hot reload): `cd apps/web && npm run build && npm run start`
 1. `npm start` (arba web dev + extension build).  
 2. **betsson.lt** — NBA eventas, rinka **Žaidėjo pelnyti taškai**.  
 3. Užvesk pelę ant seed’into žaidėjo (pvz. Luka / Jokic) — kortelė su % ir slankikliu.  
-4. Izoliacija: extension options A vs B (žvaigždutės) arba:
+4. Izoliacija: prisijunk kaip A-admin ir paprašyk B įrašo `id` — serveris grąžina 403, B duomenys nesikeičia. Watchlist keisti (POST/DELETE) gali tik **admin**; **member** gauna 403.
 
 ```bash
-curl -s http://localhost:3000/api/watchlist -H "X-Client-Id: A"
-curl -s http://localhost:3000/api/watchlist -H "X-Client-Id: B"
+# 1. Login as client A admin
+TOKEN_A=$(curl -s http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin-a@prophover.local","password":"password-admin-a"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+
+# 2. Login as client B admin and create a B watchlist row (Jokic is in the demo seed)
+TOKEN_B=$(curl -s http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin-b@prophover.local","password":"password-admin-b"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+
+curl -s -X POST http://localhost:3000/api/watchlist \
+  -H "Authorization: Bearer $TOKEN_B" \
+  -H 'Content-Type: application/json' \
+  -d '{"playerId":203999}'
+
+B_ITEM_ID=$(curl -s http://localhost:3000/api/watchlist \
+  -H "Authorization: Bearer $TOKEN_B" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
+
+# 3. Request B's record id as A-admin — expect 403
+curl -s -w '\nHTTP %{http_code}\n' \
+  "http://localhost:3000/api/watchlist?id=$B_ITEM_ID" \
+  -H "Authorization: Bearer $TOKEN_A"
+
+# 4. Try to delete B's row as A-admin — expect 403; B's list is unchanged
+curl -s -w '\nHTTP %{http_code}\n' -X DELETE \
+  "http://localhost:3000/api/watchlist?id=$B_ITEM_ID" \
+  -H "Authorization: Bearer $TOKEN_A"
+
+curl -s http://localhost:3000/api/watchlist -H "Authorization: Bearer $TOKEN_B"
+
+# Wrong password — expect 401 {"error":"invalid_credentials"} (same body for unknown email)
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin-a@prophover.local","password":"wrong"}'
 ```
+
+Jei `AUTH_REQUIRED=false`, watchlist vis dar priima `X-Client-Id` (iki extension sign-in, PH-44).
 
 Daugiau apie DB/CSV: [apps/web/README.md](apps/web/README.md), [apps/web/data/README.md](apps/web/data/README.md).
 

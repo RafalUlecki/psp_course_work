@@ -3,12 +3,13 @@ import type {
   IsPublicApiRouteProps,
 } from "./types/publicApiRoutes";
 
+export const LOGIN_API_PATH = "/api/auth/login";
+
 /**
  * Paths that skip the Bearer-token check.
- * Empty on purpose: every current API route requires a token.
- * The PH-33 login route will be the first entry.
+ * Login is the only public route; every other API route requires a token.
  */
-export const PUBLIC_API_ROUTES: readonly string[] = [];
+export const PUBLIC_API_ROUTES: readonly string[] = [LOGIN_API_PATH];
 
 export const isPublicApiRoute = (props: IsPublicApiRouteProps): boolean => {
   const { pathname, publicRoutes = PUBLIC_API_ROUTES } = props;

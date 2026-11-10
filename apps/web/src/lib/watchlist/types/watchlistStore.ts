@@ -17,9 +17,11 @@ export interface WatchlistStore {
     clientId: string,
     playerId: number,
   ) => Promise<WatchlistItemRecord | null>;
+  findItemById: (id: number) => Promise<WatchlistItemRecord | null>;
   createItem: (
     clientId: string,
     playerId: number,
   ) => Promise<WatchlistItemRecord>;
   deleteItem: (clientId: string, playerId: number) => Promise<boolean>;
+  deleteItemById: (id: number, clientId: string) => Promise<boolean>;
 }

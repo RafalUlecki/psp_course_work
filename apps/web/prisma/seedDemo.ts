@@ -3,9 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient, Venue } from "@prisma/client";
 
-import { createToken } from "../src/lib/auth/createToken";
-import { getAuthTokenTtlDays } from "../src/lib/auth/parseAuthTokenTtlDays";
-import { prismaAuthTokenStore } from "../src/lib/auth/prismaAuthTokenStore";
+import { DEV_USERS } from "../src/lib/auth/devUsers";
 import {
   TEST_CLIENT_A_ID,
   TEST_CLIENT_B_ID,
@@ -27,6 +25,7 @@ import {
   buildPlayerNameMap,
   toPlayersJson,
 } from "../src/lib/players/playerNameMap";
+import { seedDevUsers } from "./seedDevUsers";
 import { seedTestClients } from "./seedTestClients";
 
 const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -333,6 +332,10 @@ const printSummary = (props: {
   console.log(`Game logs updated: ${updated}`);
   console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
   console.log(`Clients upserted: ${TEST_CLIENT_A_ID}, ${TEST_CLIENT_B_ID}`);
+  console.log(
+    `Dev users upserted: ${DEV_USERS.map((user) => `${user.email} (${user.clientId} ${user.role})`).join(", ")}`,
+  );
+  console.log("Dev passwords: see README (hash only is stored in the database).");
 };
 
 const main = async (): Promise<void> => {
@@ -367,17 +370,7 @@ const main = async (): Promise<void> => {
   });
   writePlayersJson(players);
   await seedTestClients({ db: prisma });
-
-  const now = new Date();
-  const ttlDays = getAuthTokenTtlDays();
-  const tokenA = await createToken(
-    { clientId: TEST_CLIENT_A_ID, now, ttlDays },
-    prismaAuthTokenStore,
-  );
-  const tokenB = await createToken(
-    { clientId: TEST_CLIENT_B_ID, now, ttlDays },
-    prismaAuthTokenStore,
-  );
+  await seedDevUsers({ db: prisma });
 
   printSummary({
     seededAll,
@@ -386,8 +379,6 @@ const main = async (): Promise<void> => {
     updated,
     removedNonKaggle,
   });
-  console.log(`Dev token for client ${TEST_CLIENT_A_ID}: ${tokenA}`);
-  console.log(`Dev token for client ${TEST_CLIENT_B_ID}: ${tokenB}`);
 };
 
 const runSeed = async (): Promise<void> => {

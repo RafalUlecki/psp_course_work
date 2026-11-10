@@ -68,4 +68,6 @@ npm run seed:demo
 
 That seeds **every** player in the CSV into Postgres and writes the full name→id map to `apps/extension/data/players.json`. Optional filter: `npm run seed:demo -- --players "Luka Doncic,Austin Reaves"`. Idempotent. After re-seeding, rebuild and **reload the Chrome extension**. Source, licence, and columns: [`data/README.md`](data/README.md).
 
-The same command upserts test **Client A** (`A`) and **Client B** (`B`) with empty watchlists. Watchlist rows are added only via the API/extension star. Reads/writes are scoped by the `X-Client-Id` header; missing → 400, unknown → 401. Curl examples: [root README](../../README.md#demo).
+The same command upserts test **Client A** (`A`) and **Client B** (`B`) with empty watchlists, then four dev users (admin + member for each client). Passwords are stored hashed (`crypto.scrypt`, per-user salt). Credentials and a curl walkthrough (login as A-admin, request a B record id, expect 403) are in the [root README](../../README.md#demo).
+
+Watchlist **GET** is allowed for `admin` and `member`. **POST** / **DELETE** are admin-only (member → 403). Client comes from the verified token (`resolveAuthSession`), never from request input. Sending another client's watchlist item `id` returns 403 and leaves that client's data unchanged. If `AUTH_REQUIRED=false`, identity falls back to `X-Client-Id` (missing → 400, unknown → 401) until the extension sign-in flow (PH-44).

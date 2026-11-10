@@ -5,6 +5,7 @@ export interface VerifyTokenProps {
 
 export interface VerifyTokenSuccess {
   ok: true;
+  userId: string;
   clientId: string;
   tokenHash: string;
 }
