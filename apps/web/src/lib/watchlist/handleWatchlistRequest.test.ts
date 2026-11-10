@@ -411,7 +411,7 @@ describe("handleWatchlistRequest", () => {
     });
   });
 
-  it("should return 403 when a member posts a watchlist player", async () => {
+  it("should create a watchlist row when a member posts a player id", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
@@ -424,12 +424,12 @@ describe("handleWatchlistRequest", () => {
     );
 
     assert.deepEqual(result, {
-      status: 403,
-      body: { error: FORBIDDEN_ERROR },
+      status: 201,
+      body: { clientId: TEST_CLIENT_A_ID, playerId: SHARED_PLAYER_ID, id: 3 },
     });
   });
 
-  it("should keep the watchlist unchanged when a member posts a player", async () => {
+  it("should include the player when a member posts a watchlist player", async () => {
     const store = seededStore();
     await handleWatchlistRequest(
       {
@@ -443,10 +443,13 @@ describe("handleWatchlistRequest", () => {
     );
     const result = await listRequest(authFor(TEST_CLIENT_A_ID, "member"), store);
 
-    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
+    assert.deepEqual(listPlayerIds(result), [
+      CLIENT_A_PLAYER_ID,
+      SHARED_PLAYER_ID,
+    ]);
   });
 
-  it("should return 403 when a member deletes a watchlist item", async () => {
+  it("should delete the item when a member deletes their own watchlist item id", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "DELETE",
@@ -459,12 +462,16 @@ describe("handleWatchlistRequest", () => {
     );
 
     assert.deepEqual(result, {
-      status: 403,
-      body: { error: FORBIDDEN_ERROR },
+      status: 200,
+      body: {
+        clientId: TEST_CLIENT_A_ID,
+        id: 1,
+        playerId: CLIENT_A_PLAYER_ID,
+      },
     });
   });
 
-  it("should keep the item when a member deletes a watchlist item", async () => {
+  it("should omit the item from the list after a member deletes it", async () => {
     const store = seededStore();
     await handleWatchlistRequest(
       {
@@ -478,7 +485,7 @@ describe("handleWatchlistRequest", () => {
     );
     const result = await listRequest(authFor(TEST_CLIENT_A_ID, "member"), store);
 
-    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
+    assert.deepEqual(listPlayerIds(result), []);
   });
 
   it("should delete the item when an admin deletes their own watchlist item id", async () => {

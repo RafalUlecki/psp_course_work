@@ -1,5 +1,4 @@
 import { forbiddenResult } from "../auth/forbiddenResult";
-import { isAdminAuth } from "../auth/isAdminAuth";
 import { parseClientIdHeader } from "../clients/parseClientIdHeader";
 import { UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
 import {
@@ -189,7 +188,7 @@ export const handleWatchlistRequest = async (
   props: HandleWatchlistRequestProps,
   store: WatchlistStore = prismaWatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { method, searchParams, bodyText, auth } = props;
+  const { method, searchParams, bodyText } = props;
   const resolved = await resolveWatchlistClientId(props, store);
 
   if (!resolved.ok) {
@@ -206,16 +205,10 @@ export const handleWatchlistRequest = async (
   }
 
   if (method === "POST") {
-    if (!isAdminAuth(auth)) {
-      return forbiddenResult();
-    }
     return addForClient({ clientId, bodyText }, store);
   }
 
   if (method === "DELETE") {
-    if (!isAdminAuth(auth)) {
-      return forbiddenResult();
-    }
     if (searchParams.get("id") !== null) {
       return removeByItemId({ clientId, searchParams }, store);
     }

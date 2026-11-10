@@ -8,8 +8,15 @@ export interface UserRecord {
   role: UserRole;
 }
 
+export interface UserPublicRecord {
+  id: string;
+  email: string;
+  role: UserRole;
+}
+
 export interface UserStore {
   insert: (record: UserRecord) => Promise<UserRecord>;
   findById: (id: string) => Promise<UserRecord | null>;
   findByEmail: (email: string) => Promise<UserRecord | null>;
+  listByClientId: (clientId: string) => Promise<UserPublicRecord[]>;
 }

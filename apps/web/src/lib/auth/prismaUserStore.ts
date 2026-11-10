@@ -14,4 +14,10 @@ export const prismaUserStore: UserStore = {
     }),
   findById: (id) => prisma.user.findUnique({ where: { id } }),
   findByEmail: (email) => prisma.user.findUnique({ where: { email } }),
+  listByClientId: (clientId) =>
+    prisma.user.findMany({
+      where: { clientId },
+      select: { id: true, email: true, role: true },
+      orderBy: { email: "asc" },
+    }),
 };

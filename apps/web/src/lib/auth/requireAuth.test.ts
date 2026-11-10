@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import { OPTIONS as loginOptions } from "../../../app/api/auth/login/route";
 import { OPTIONS as revokeOptions } from "../../../app/api/auth/revoke/route";
+import { OPTIONS as clientUsersOptions } from "../../../app/api/client/users/route";
 import { OPTIONS as hitRateOptions } from "../../../app/api/hit-rate/route";
 import { OPTIONS as watchlistOptions } from "../../../app/api/watchlist/route";
 import { TEST_CLIENT_A_ID } from "../clients/constants";
@@ -276,6 +277,12 @@ describe("API OPTIONS handlers", () => {
 
   it("should return 204 from login OPTIONS without a token", async () => {
     const response = await loginOptions();
+
+    assert.equal(response.status, 204);
+  });
+
+  it("should return 204 from client-users OPTIONS without a token", async () => {
+    const response = await clientUsersOptions();
 
     assert.equal(response.status, 204);
   });

@@ -112,7 +112,7 @@ Produkcinis web (be hot reload): `cd apps/web && npm run build && npm run start`
 1. `npm start` (arba web dev + extension build).  
 2. **betsson.lt** — NBA eventas, rinka **Žaidėjo pelnyti taškai**.  
 3. Užvesk pelę ant seed’into žaidėjo (pvz. Luka / Jokic) — kortelė su % ir slankikliu.  
-4. Izoliacija: prisijunk kaip A-admin ir paprašyk B įrašo `id` — serveris grąžina 403, B duomenys nesikeičia. Watchlist keisti (POST/DELETE) gali tik **admin**; **member** gauna 403.
+4. Izoliacija: prisijunk kaip A-admin ir paprašyk B įrašo `id` — serveris grąžina 403, B duomenys nesikeičia. Watchlist GET/POST/DELETE gali ir **admin**, ir **member**, bet tik savo kliento eilutes. Kliento vartotojų sąrašas (`GET /api/client/users`) — tik **admin** (member → 403).
 
 ```bash
 # 1. Login as client A admin
@@ -147,6 +147,19 @@ curl -s -w '\nHTTP %{http_code}\n' -X DELETE \
   -H "Authorization: Bearer $TOKEN_A"
 
 curl -s http://localhost:3000/api/watchlist -H "Authorization: Bearer $TOKEN_B"
+
+# 5. List users of client A as A-admin — 200, only A's users (no passwordHash)
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
+  -H "Authorization: Bearer $TOKEN_A"
+
+# 6. Same list as A-member — expect 403
+TOKEN_A_MEMBER=$(curl -s http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"member-a@prophover.local","password":"password-member-a"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
+  -H "Authorization: Bearer $TOKEN_A_MEMBER"
 
 # Wrong password — expect 401 {"error":"invalid_credentials"} (same body for unknown email)
 curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \
