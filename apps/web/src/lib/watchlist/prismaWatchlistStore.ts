@@ -1,6 +1,13 @@
 import { prisma } from "../prisma";
 import type { WatchlistStore } from "./types/watchlistStore";
 
+const itemSelect = {
+  id: true,
+  userId: true,
+  clientId: true,
+  playerId: true,
+} as const;
+
 export const prismaWatchlistStore: WatchlistStore = {
   findClientById: (clientId) =>
     prisma.client.findUnique({
@@ -14,36 +21,52 @@ export const prismaWatchlistStore: WatchlistStore = {
     });
     return player !== null;
   },
-  listByClientId: (clientId) =>
+  listByOwner: (owner) =>
     prisma.watchlistItem.findMany({
-      where: { clientId },
-      select: { id: true, clientId: true, playerId: true },
+      where: { userId: owner.userId, clientId: owner.clientId },
+      select: itemSelect,
       orderBy: { id: "asc" },
     }),
-  findItem: (clientId, playerId) =>
-    prisma.watchlistItem.findUnique({
-      where: { clientId_playerId: { clientId, playerId } },
-      select: { id: true, clientId: true, playerId: true },
+  findItem: (owner, playerId) =>
+    prisma.watchlistItem.findFirst({
+      where: {
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      },
+      select: itemSelect,
     }),
   findItemById: (id) =>
     prisma.watchlistItem.findUnique({
       where: { id },
-      select: { id: true, clientId: true, playerId: true },
+      select: itemSelect,
     }),
-  createItem: (clientId, playerId) =>
+  createItem: (owner, playerId) =>
     prisma.watchlistItem.create({
-      data: { clientId, playerId },
-      select: { id: true, clientId: true, playerId: true },
+      data: {
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      },
+      select: itemSelect,
     }),
-  deleteItem: async (clientId, playerId) => {
+  deleteItem: async (owner, playerId) => {
     const result = await prisma.watchlistItem.deleteMany({
-      where: { clientId, playerId },
+      where: {
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      },
     });
     return result.count > 0;
   },
-  deleteItemById: async (id, clientId) => {
+  deleteItemById: async (id, owner) => {
     const result = await prisma.watchlistItem.deleteMany({
-      where: { id, clientId },
+      where: {
+        id,
+        userId: owner.userId,
+        clientId: owner.clientId,
+      },
     });
     return result.count > 0;
   },

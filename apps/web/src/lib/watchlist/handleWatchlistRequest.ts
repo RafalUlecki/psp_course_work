@@ -1,6 +1,5 @@
 import { forbiddenResult } from "../auth/forbiddenResult";
-import { parseClientIdHeader } from "../clients/parseClientIdHeader";
-import { UNKNOWN_CLIENT_ID_ERROR } from "../clients/errors";
+import { unauthorizedResult } from "../auth/unauthorizedResult";
 import {
   METHOD_NOT_ALLOWED_ERROR,
   PLAYER_NOT_FOUND_ERROR,
@@ -14,28 +13,34 @@ import {
 } from "./query/parseWatchlistPlayerId";
 import type { WatchlistHttpResult } from "./types/api";
 import type { HandleWatchlistRequestProps } from "./types/handleWatchlistRequest";
-import type { WatchlistStore } from "./types/watchlistStore";
+import type { WatchlistOwner, WatchlistStore } from "./types/watchlistStore";
 
-const listForClient = async (
-  clientId: string,
+const listForOwner = async (
+  owner: WatchlistOwner,
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const rows = await store.listByClientId(clientId);
+  const rows = await store.listByOwner(owner);
 
   return {
     status: 200,
     body: {
-      clientId,
+      userId: owner.userId,
+      clientId: owner.clientId,
       items: rows.map((row) => ({ id: row.id, playerId: row.playerId })),
     },
   };
 };
 
-const getItemForClient = async (
-  props: { clientId: string; searchParams: URLSearchParams },
+const itemBelongsToOwner = (
+  item: { userId: string; clientId: string },
+  owner: WatchlistOwner,
+): boolean => item.userId === owner.userId && item.clientId === owner.clientId;
+
+const getItemForOwner = async (
+  props: { owner: WatchlistOwner; searchParams: URLSearchParams },
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { clientId, searchParams } = props;
+  const { owner, searchParams } = props;
   const parsed = parseWatchlistItemIdQuery({ searchParams });
 
   if (!parsed.ok) {
@@ -47,13 +52,14 @@ const getItemForClient = async (
     return { status: 404, body: { error: WATCHLIST_ITEM_NOT_FOUND_ERROR } };
   }
 
-  if (item.clientId !== clientId) {
+  if (!itemBelongsToOwner(item, owner)) {
     return forbiddenResult();
   }
 
   return {
     status: 200,
     body: {
+      userId: item.userId,
       clientId: item.clientId,
       id: item.id,
       playerId: item.playerId,
@@ -61,11 +67,11 @@ const getItemForClient = async (
   };
 };
 
-const addForClient = async (
-  props: { clientId: string; bodyText: string },
+const addForOwner = async (
+  props: { owner: WatchlistOwner; bodyText: string },
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { clientId, bodyText } = props;
+  const { owner, bodyText } = props;
   const parsed = parseWatchlistPlayerIdBody({ bodyText });
 
   if (!parsed.ok) {
@@ -77,46 +83,60 @@ const addForClient = async (
     return { status: 400, body: { error: PLAYER_NOT_FOUND_ERROR } };
   }
 
-  const existing = await store.findItem(clientId, parsed.playerId);
+  const existing = await store.findItem(owner, parsed.playerId);
   if (existing !== null) {
     return {
       status: 200,
-      body: { clientId, playerId: parsed.playerId, id: existing.id },
+      body: {
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId: parsed.playerId,
+        id: existing.id,
+      },
     };
   }
 
-  const created = await store.createItem(clientId, parsed.playerId);
+  const created = await store.createItem(owner, parsed.playerId);
 
   return {
     status: 201,
-    body: { clientId, playerId: parsed.playerId, id: created.id },
+    body: {
+      userId: owner.userId,
+      clientId: owner.clientId,
+      playerId: parsed.playerId,
+      id: created.id,
+    },
   };
 };
 
 const removeByPlayerId = async (
-  props: { clientId: string; searchParams: URLSearchParams },
+  props: { owner: WatchlistOwner; searchParams: URLSearchParams },
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { clientId, searchParams } = props;
+  const { owner, searchParams } = props;
   const parsed = parseWatchlistPlayerIdQuery({ searchParams });
 
   if (!parsed.ok) {
     return { status: 400, body: { error: parsed.error } };
   }
 
-  await store.deleteItem(clientId, parsed.playerId);
+  await store.deleteItem(owner, parsed.playerId);
 
   return {
     status: 200,
-    body: { clientId, playerId: parsed.playerId },
+    body: {
+      userId: owner.userId,
+      clientId: owner.clientId,
+      playerId: parsed.playerId,
+    },
   };
 };
 
 const removeByItemId = async (
-  props: { clientId: string; searchParams: URLSearchParams },
+  props: { owner: WatchlistOwner; searchParams: URLSearchParams },
   store: WatchlistStore,
 ): Promise<WatchlistHttpResult> => {
-  const { clientId, searchParams } = props;
+  const { owner, searchParams } = props;
   const parsed = parseWatchlistItemIdQuery({ searchParams });
 
   if (!parsed.ok) {
@@ -128,60 +148,50 @@ const removeByItemId = async (
     return { status: 404, body: { error: WATCHLIST_ITEM_NOT_FOUND_ERROR } };
   }
 
-  if (item.clientId !== clientId) {
+  if (!itemBelongsToOwner(item, owner)) {
     return forbiddenResult();
   }
 
-  await store.deleteItemById(item.id, clientId);
+  await store.deleteItemById(item.id, owner);
 
   return {
     status: 200,
-    body: { clientId, id: item.id, playerId: item.playerId },
+    body: {
+      userId: owner.userId,
+      clientId: owner.clientId,
+      id: item.id,
+      playerId: item.playerId,
+    },
   };
 };
 
-interface ResolvedWatchlistClient {
+interface ResolvedWatchlistOwner {
   ok: true;
-  clientId: string;
+  owner: WatchlistOwner;
 }
 
-interface UnresolvedWatchlistClient {
+interface UnresolvedWatchlistOwner {
   ok: false;
   result: WatchlistHttpResult;
 }
 
-type ResolveWatchlistClientIdResult =
-  | ResolvedWatchlistClient
-  | UnresolvedWatchlistClient;
+type ResolveWatchlistOwnerResult =
+  | ResolvedWatchlistOwner
+  | UnresolvedWatchlistOwner;
 
-const resolveWatchlistClientId = async (
+const resolveWatchlistOwner = (
   props: HandleWatchlistRequestProps,
-  store: WatchlistStore,
-): Promise<ResolveWatchlistClientIdResult> => {
-  const { headers, auth } = props;
+): ResolveWatchlistOwnerResult => {
+  const { auth } = props;
 
-  if (!auth.skipped) {
-    return { ok: true, clientId: auth.clientId };
+  if (auth.skipped) {
+    return { ok: false, result: unauthorizedResult() };
   }
 
-  const parsedClient = parseClientIdHeader({ headers });
-
-  if (!parsedClient.ok) {
-    return {
-      ok: false,
-      result: { status: 400, body: { error: parsedClient.error } },
-    };
-  }
-
-  const client = await store.findClientById(parsedClient.clientId);
-  if (client === null) {
-    return {
-      ok: false,
-      result: { status: 401, body: { error: UNKNOWN_CLIENT_ID_ERROR } },
-    };
-  }
-
-  return { ok: true, clientId: client.id };
+  return {
+    ok: true,
+    owner: { userId: auth.userId, clientId: auth.clientId },
+  };
 };
 
 export const handleWatchlistRequest = async (
@@ -189,30 +199,30 @@ export const handleWatchlistRequest = async (
   store: WatchlistStore = prismaWatchlistStore,
 ): Promise<WatchlistHttpResult> => {
   const { method, searchParams, bodyText } = props;
-  const resolved = await resolveWatchlistClientId(props, store);
+  const resolved = resolveWatchlistOwner(props);
 
   if (!resolved.ok) {
     return resolved.result;
   }
 
-  const { clientId } = resolved;
+  const { owner } = resolved;
 
   if (method === "GET") {
     if (searchParams.get("id") !== null) {
-      return getItemForClient({ clientId, searchParams }, store);
+      return getItemForOwner({ owner, searchParams }, store);
     }
-    return listForClient(clientId, store);
+    return listForOwner(owner, store);
   }
 
   if (method === "POST") {
-    return addForClient({ clientId, bodyText }, store);
+    return addForOwner({ owner, bodyText }, store);
   }
 
   if (method === "DELETE") {
     if (searchParams.get("id") !== null) {
-      return removeByItemId({ clientId, searchParams }, store);
+      return removeByItemId({ owner, searchParams }, store);
     }
-    return removeByPlayerId({ clientId, searchParams }, store);
+    return removeByPlayerId({ owner, searchParams }, store);
   }
 
   return { status: 405, body: { error: METHOD_NOT_ALLOWED_ERROR } };

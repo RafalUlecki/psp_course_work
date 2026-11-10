@@ -13,6 +13,7 @@ import { handleWatchlistRequest } from "./handleWatchlistRequest";
 import type { WatchlistHttpResult } from "./types/api";
 import type {
   WatchlistItemRecord,
+  WatchlistOwner,
   WatchlistStore,
 } from "./types/watchlistStore";
 
@@ -63,28 +64,38 @@ const createMemoryStore = (props: {
     { id: TEST_CLIENT_A_ID, name: TEST_CLIENT_A_NAME },
     { id: TEST_CLIENT_B_ID, name: TEST_CLIENT_B_NAME },
   ];
+  const belongsToOwner = (
+    item: WatchlistItemRecord,
+    owner: WatchlistOwner,
+  ): boolean =>
+    item.userId === owner.userId && item.clientId === owner.clientId;
 
   return {
     findClientById: async (clientId) =>
       clients.find((client) => client.id === clientId) ?? null,
     playerExists: async (playerId) => playerIds.has(playerId),
-    listByClientId: async (clientId) =>
-      state.items.filter((item) => item.clientId === clientId),
-    findItem: async (clientId, playerId) =>
+    listByOwner: async (owner) =>
+      state.items.filter((item) => belongsToOwner(item, owner)),
+    findItem: async (owner, playerId) =>
       state.items.find(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
       ) ?? null,
     findItemById: async (id) =>
       state.items.find((item) => item.id === id) ?? null,
-    createItem: async (clientId, playerId) => {
-      const item = { id: nextId, clientId, playerId };
+    createItem: async (owner, playerId) => {
+      const item = {
+        id: nextId,
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      };
       nextId += 1;
       state.items.push(item);
       return item;
     },
-    deleteItem: async (clientId, playerId) => {
+    deleteItem: async (owner, playerId) => {
       const index = state.items.findIndex(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
       );
       if (index === -1) {
         return false;
@@ -92,9 +103,9 @@ const createMemoryStore = (props: {
       state.items.splice(index, 1);
       return true;
     },
-    deleteItemById: async (id, clientId) => {
+    deleteItemById: async (id, owner) => {
       const index = state.items.findIndex(
-        (item) => item.id === id && item.clientId === clientId,
+        (item) => item.id === id && belongsToOwner(item, owner),
       );
       if (index === -1) {
         return false;

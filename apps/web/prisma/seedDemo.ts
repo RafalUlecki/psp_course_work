@@ -26,6 +26,7 @@ import {
   toPlayersJson,
 } from "../src/lib/players/playerNameMap";
 import { seedDevUsers } from "./seedDevUsers";
+import { seedDevWatchlistItems } from "./seedDevWatchlistItems";
 import { seedTestClients } from "./seedTestClients";
 
 const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -336,6 +337,9 @@ const printSummary = (props: {
     `Dev users upserted: ${DEV_USERS.map((user) => `${user.email} (${user.clientId} ${user.role})`).join(", ")}`,
   );
   console.log("Dev passwords: see README (hash only is stored in the database).");
+  console.log(
+    "Watchlists are per user (admin-a and admin-b each get a demo star if that player was seeded).",
+  );
 };
 
 const main = async (): Promise<void> => {
@@ -371,6 +375,7 @@ const main = async (): Promise<void> => {
   writePlayersJson(players);
   await seedTestClients({ db: prisma });
   await seedDevUsers({ db: prisma });
+  await seedDevWatchlistItems({ db: prisma, playerIds });
 
   printSummary({
     seededAll,

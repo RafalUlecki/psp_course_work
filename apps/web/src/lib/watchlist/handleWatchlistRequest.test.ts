@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { FORBIDDEN_ERROR } from "../auth/errors";
+import { FORBIDDEN_ERROR, UNAUTHORIZED_ERROR } from "../auth/errors";
 import type {
   RequireAuthAuthenticated,
   RequireAuthSkipped,
@@ -14,7 +14,6 @@ import {
   TEST_CLIENT_B_ID,
   TEST_CLIENT_B_NAME,
 } from "../clients/constants";
-import { MISSING_CLIENT_ID_ERROR } from "../clients/errors";
 import { handleWatchlistRequest } from "./handleWatchlistRequest";
 import {
   MISSING_PLAYER_ID_ERROR,
@@ -24,12 +23,14 @@ import {
 import type { WatchlistHttpResult } from "./types/api";
 import type {
   WatchlistItemRecord,
+  WatchlistOwner,
   WatchlistStore,
 } from "./types/watchlistStore";
 
 const CLIENT_A_PLAYER_ID = 203999;
 const CLIENT_B_PLAYER_ID = 1629029;
 const SHARED_PLAYER_ID = 1630559;
+const MEMBER_A_PLAYER_ID = 1628369;
 
 interface MemoryStoreState {
   items: WatchlistItemRecord[];
@@ -49,6 +50,10 @@ const authFor = (
 
 const skippedAuth: RequireAuthSkipped = { ok: true, skipped: true };
 
+const USER_A_ADMIN = authFor(TEST_CLIENT_A_ID, "admin");
+const USER_A_MEMBER = authFor(TEST_CLIENT_A_ID, "member");
+const USER_B_ADMIN = authFor(TEST_CLIENT_B_ID, "admin");
+
 const createMemoryStore = (props: {
   items?: WatchlistItemRecord[];
   players?: number[];
@@ -64,28 +69,38 @@ const createMemoryStore = (props: {
     { id: TEST_CLIENT_A_ID, name: TEST_CLIENT_A_NAME },
     { id: TEST_CLIENT_B_ID, name: TEST_CLIENT_B_NAME },
   ];
+  const belongsToOwner = (
+    item: WatchlistItemRecord,
+    owner: WatchlistOwner,
+  ): boolean =>
+    item.userId === owner.userId && item.clientId === owner.clientId;
 
   return {
     findClientById: async (clientId) =>
       clients.find((client) => client.id === clientId) ?? null,
     playerExists: async (playerId) => playerIds.has(playerId),
-    listByClientId: async (clientId) =>
-      state.items.filter((item) => item.clientId === clientId),
-    findItem: async (clientId, playerId) =>
+    listByOwner: async (owner) =>
+      state.items.filter((item) => belongsToOwner(item, owner)),
+    findItem: async (owner, playerId) =>
       state.items.find(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
       ) ?? null,
     findItemById: async (id) =>
       state.items.find((item) => item.id === id) ?? null,
-    createItem: async (clientId, playerId) => {
-      const item = { id: nextId, clientId, playerId };
+    createItem: async (owner, playerId) => {
+      const item = {
+        id: nextId,
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      };
       nextId += 1;
       state.items.push(item);
       return item;
     },
-    deleteItem: async (clientId, playerId) => {
+    deleteItem: async (owner, playerId) => {
       const index = state.items.findIndex(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
       );
       if (index === -1) {
         return false;
@@ -93,9 +108,9 @@ const createMemoryStore = (props: {
       state.items.splice(index, 1);
       return true;
     },
-    deleteItemById: async (id, clientId) => {
+    deleteItemById: async (id, owner) => {
       const index = state.items.findIndex(
-        (item) => item.id === id && item.clientId === clientId,
+        (item) => item.id === id && belongsToOwner(item, owner),
       );
       if (index === -1) {
         return false;
@@ -109,10 +124,31 @@ const createMemoryStore = (props: {
 const seededStore = (): WatchlistStore =>
   createMemoryStore({
     items: [
-      { id: 1, clientId: TEST_CLIENT_A_ID, playerId: CLIENT_A_PLAYER_ID },
-      { id: 2, clientId: TEST_CLIENT_B_ID, playerId: CLIENT_B_PLAYER_ID },
+      {
+        id: 1,
+        userId: USER_A_ADMIN.userId,
+        clientId: TEST_CLIENT_A_ID,
+        playerId: CLIENT_A_PLAYER_ID,
+      },
+      {
+        id: 2,
+        userId: USER_B_ADMIN.userId,
+        clientId: TEST_CLIENT_B_ID,
+        playerId: CLIENT_B_PLAYER_ID,
+      },
+      {
+        id: 3,
+        userId: USER_A_MEMBER.userId,
+        clientId: TEST_CLIENT_A_ID,
+        playerId: MEMBER_A_PLAYER_ID,
+      },
     ],
-    players: [CLIENT_A_PLAYER_ID, CLIENT_B_PLAYER_ID, SHARED_PLAYER_ID],
+    players: [
+      CLIENT_A_PLAYER_ID,
+      CLIENT_B_PLAYER_ID,
+      SHARED_PLAYER_ID,
+      MEMBER_A_PLAYER_ID,
+    ],
   });
 
 const listRequest = (
@@ -148,42 +184,46 @@ const errorMessage = (result: WatchlistHttpResult): string | null =>
     : null;
 
 describe("handleWatchlistRequest", () => {
-  it("should return only client A player ids when listing with A's token", async () => {
-    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore());
+  it("should return only client A admin player ids when listing with that token", async () => {
+    const result = await listRequest(USER_A_ADMIN, seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
-  it("should return only client B player ids when listing with B's token", async () => {
-    const result = await listRequest(authFor(TEST_CLIENT_B_ID), seededStore());
+  it("should return only client B admin player ids when listing with that token", async () => {
+    const result = await listRequest(USER_B_ADMIN, seededStore());
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
 
   it("should ignore X-Client-Id when a token is present", async () => {
-    const result = await listRequest(authFor(TEST_CLIENT_A_ID), seededStore(), {
+    const result = await listRequest(USER_A_ADMIN, seededStore(), {
       [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID,
     });
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
-  it("should create a watchlist row for client A when A posts a player id", async () => {
-    const store = seededStore();
+  it("should create a watchlist row for the session user when posting a player id", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
-      store,
+      seededStore(),
     );
 
     assert.deepEqual(result, {
       status: 201,
-      body: { clientId: TEST_CLIENT_A_ID, playerId: SHARED_PLAYER_ID, id: 3 },
+      body: {
+        userId: USER_A_ADMIN.userId,
+        clientId: TEST_CLIENT_A_ID,
+        playerId: SHARED_PLAYER_ID,
+        id: 4,
+      },
     });
   });
 
@@ -195,7 +235,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       store,
     );
@@ -205,7 +245,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_B_ID),
+        auth: USER_B_ADMIN,
       },
       store,
     );
@@ -220,7 +260,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "{}",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       seededStore(),
     );
@@ -235,7 +275,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: 1 }),
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       seededStore(),
     );
@@ -253,7 +293,7 @@ describe("handleWatchlistRequest", () => {
           playerId: String(CLIENT_A_PLAYER_ID),
         }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       store,
     );
@@ -263,7 +303,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_B_ID),
+        auth: USER_B_ADMIN,
       },
       store,
     );
@@ -271,7 +311,7 @@ describe("handleWatchlistRequest", () => {
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
 
-  it("should return 400 when auth is not required and X-Client-Id is missing", async () => {
+  it("should return 401 when auth is skipped", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "GET",
@@ -284,12 +324,12 @@ describe("handleWatchlistRequest", () => {
     );
 
     assert.deepEqual(result, {
-      status: 400,
-      body: { error: MISSING_CLIENT_ID_ERROR },
+      status: 401,
+      body: { error: UNAUTHORIZED_ERROR },
     });
   });
 
-  it("should list by X-Client-Id when auth is not required", async () => {
+  it("should return 401 when auth is skipped even with X-Client-Id", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "GET",
@@ -301,7 +341,10 @@ describe("handleWatchlistRequest", () => {
       seededStore(),
     );
 
-    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
+    assert.deepEqual(result, {
+      status: 401,
+      body: { error: UNAUTHORIZED_ERROR },
+    });
   });
 
   it("should return 403 when client A reads client B's watchlist item id", async () => {
@@ -311,7 +354,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "2" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       seededStore(),
     );
@@ -330,11 +373,11 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "2" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       store,
     );
-    const result = await listRequest(authFor(TEST_CLIENT_B_ID), store);
+    const result = await listRequest(USER_B_ADMIN, store);
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
@@ -346,7 +389,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "2" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       seededStore(),
     );
@@ -365,11 +408,11 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "2" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       store,
     );
-    const result = await listRequest(authFor(TEST_CLIENT_B_ID), store);
+    const result = await listRequest(USER_B_ADMIN, store);
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });
@@ -381,7 +424,7 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "99" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID),
+        auth: USER_A_ADMIN,
       },
       seededStore(),
     );
@@ -394,9 +437,9 @@ describe("handleWatchlistRequest", () => {
       {
         method: "GET",
         headers: new Headers(),
-        searchParams: new URLSearchParams({ id: "1" }),
+        searchParams: new URLSearchParams({ id: "3" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID, "member"),
+        auth: USER_A_MEMBER,
       },
       seededStore(),
     );
@@ -404,9 +447,10 @@ describe("handleWatchlistRequest", () => {
     assert.deepEqual(result, {
       status: 200,
       body: {
+        userId: USER_A_MEMBER.userId,
         clientId: TEST_CLIENT_A_ID,
-        id: 1,
-        playerId: CLIENT_A_PLAYER_ID,
+        id: 3,
+        playerId: MEMBER_A_PLAYER_ID,
       },
     });
   });
@@ -418,18 +462,23 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        auth: authFor(TEST_CLIENT_A_ID, "member"),
+        auth: USER_A_MEMBER,
       },
       seededStore(),
     );
 
     assert.deepEqual(result, {
       status: 201,
-      body: { clientId: TEST_CLIENT_A_ID, playerId: SHARED_PLAYER_ID, id: 3 },
+      body: {
+        userId: USER_A_MEMBER.userId,
+        clientId: TEST_CLIENT_A_ID,
+        playerId: SHARED_PLAYER_ID,
+        id: 4,
+      },
     });
   });
 
-  it("should include the player when a member posts a watchlist player", async () => {
+  it("should include the player on the member list when a member posts", async () => {
     const store = seededStore();
     await handleWatchlistRequest(
       {
@@ -437,14 +486,14 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
-        auth: authFor(TEST_CLIENT_A_ID, "member"),
+        auth: USER_A_MEMBER,
       },
       store,
     );
-    const result = await listRequest(authFor(TEST_CLIENT_A_ID, "member"), store);
+    const result = await listRequest(USER_A_MEMBER, store);
 
     assert.deepEqual(listPlayerIds(result), [
-      CLIENT_A_PLAYER_ID,
+      MEMBER_A_PLAYER_ID,
       SHARED_PLAYER_ID,
     ]);
   });
@@ -454,9 +503,9 @@ describe("handleWatchlistRequest", () => {
       {
         method: "DELETE",
         headers: new Headers(),
-        searchParams: new URLSearchParams({ id: "1" }),
+        searchParams: new URLSearchParams({ id: "3" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID, "member"),
+        auth: USER_A_MEMBER,
       },
       seededStore(),
     );
@@ -464,14 +513,99 @@ describe("handleWatchlistRequest", () => {
     assert.deepEqual(result, {
       status: 200,
       body: {
+        userId: USER_A_MEMBER.userId,
+        clientId: TEST_CLIENT_A_ID,
+        id: 3,
+        playerId: MEMBER_A_PLAYER_ID,
+      },
+    });
+  });
+
+  it("should omit the item from the member list after the member deletes it", async () => {
+    const store = seededStore();
+    await handleWatchlistRequest(
+      {
+        method: "DELETE",
+        headers: new Headers(),
+        searchParams: new URLSearchParams({ id: "3" }),
+        bodyText: "",
+        auth: USER_A_MEMBER,
+      },
+      store,
+    );
+    const result = await listRequest(USER_A_MEMBER, store);
+
+    assert.deepEqual(listPlayerIds(result), []);
+  });
+
+  it("should delete the item when an admin deletes their own watchlist item id", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "DELETE",
+        headers: new Headers(),
+        searchParams: new URLSearchParams({ id: "1" }),
+        bodyText: "",
+        auth: USER_A_ADMIN,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(result, {
+      status: 200,
+      body: {
+        userId: USER_A_ADMIN.userId,
         clientId: TEST_CLIENT_A_ID,
         id: 1,
         playerId: CLIENT_A_PLAYER_ID,
       },
     });
   });
+});
 
-  it("should omit the item from the list after a member deletes it", async () => {
+describe("watchlist same-client user isolation", () => {
+  it("should omit A1 items when A2 lists in the same client", async () => {
+    const result = await listRequest(USER_A_MEMBER, seededStore());
+
+    assert.deepEqual(listPlayerIds(result), [MEMBER_A_PLAYER_ID]);
+  });
+
+  it("should return 403 when A2 reads A1's watchlist item id", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "GET",
+        headers: new Headers(),
+        searchParams: new URLSearchParams({ id: "1" }),
+        bodyText: "",
+        auth: USER_A_MEMBER,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(result, {
+      status: 403,
+      body: { error: FORBIDDEN_ERROR },
+    });
+  });
+
+  it("should return 403 when A2 deletes A1's watchlist item id", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "DELETE",
+        headers: new Headers(),
+        searchParams: new URLSearchParams({ id: "1" }),
+        bodyText: "",
+        auth: USER_A_MEMBER,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(result, {
+      status: 403,
+      body: { error: FORBIDDEN_ERROR },
+    });
+  });
+
+  it("should keep A1's items when A2 deletes A1's watchlist item id", async () => {
     const store = seededStore();
     await handleWatchlistRequest(
       {
@@ -479,35 +613,66 @@ describe("handleWatchlistRequest", () => {
         headers: new Headers(),
         searchParams: new URLSearchParams({ id: "1" }),
         bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID, "member"),
+        auth: USER_A_MEMBER,
       },
       store,
     );
-    const result = await listRequest(authFor(TEST_CLIENT_A_ID, "member"), store);
+    const result = await listRequest(USER_A_ADMIN, store);
 
-    assert.deepEqual(listPlayerIds(result), []);
+    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
-  it("should delete the item when an admin deletes their own watchlist item id", async () => {
+  it("should omit A1's added player from A2's list", async () => {
     const store = seededStore();
-    const result = await handleWatchlistRequest(
+    await handleWatchlistRequest(
       {
-        method: "DELETE",
+        method: "POST",
         headers: new Headers(),
-        searchParams: new URLSearchParams({ id: "1" }),
-        bodyText: "",
-        auth: authFor(TEST_CLIENT_A_ID, "admin"),
+        searchParams: new URLSearchParams(),
+        bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: USER_A_ADMIN,
       },
       store,
     );
+    const result = await listRequest(USER_A_MEMBER, store);
 
-    assert.deepEqual(result, {
-      status: 200,
-      body: {
-        clientId: TEST_CLIENT_A_ID,
-        id: 1,
-        playerId: CLIENT_A_PLAYER_ID,
+    assert.deepEqual(listPlayerIds(result), [MEMBER_A_PLAYER_ID]);
+  });
+
+  it("should let both users in the same client add the same player independently", async () => {
+    const store = seededStore();
+    await handleWatchlistRequest(
+      {
+        method: "POST",
+        headers: new Headers(),
+        searchParams: new URLSearchParams(),
+        bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: USER_A_ADMIN,
       },
-    });
+      store,
+    );
+    await handleWatchlistRequest(
+      {
+        method: "POST",
+        headers: new Headers(),
+        searchParams: new URLSearchParams(),
+        bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: USER_A_MEMBER,
+      },
+      store,
+    );
+    const adminList = await listRequest(USER_A_ADMIN, store);
+    const memberList = await listRequest(USER_A_MEMBER, store);
+
+    assert.deepEqual(
+      {
+        admin: listPlayerIds(adminList),
+        member: listPlayerIds(memberList),
+      },
+      {
+        admin: [CLIENT_A_PLAYER_ID, SHARED_PLAYER_ID],
+        member: [MEMBER_A_PLAYER_ID, SHARED_PLAYER_ID],
+      },
+    );
   });
 });

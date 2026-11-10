@@ -18,6 +18,7 @@ export const seedDevUsers = async (
     await db.user.upsert({
       where: { email: devUser.email },
       create: {
+        id: devUser.id,
         email: devUser.email,
         passwordHash,
         clientId: devUser.clientId,

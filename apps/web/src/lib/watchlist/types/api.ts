@@ -4,17 +4,20 @@ export interface WatchlistItemDto {
 }
 
 export interface WatchlistListResponse {
+  userId: string;
   clientId: string;
   items: WatchlistItemDto[];
 }
 
 export interface WatchlistItemResponse {
+  userId: string;
   clientId: string;
   id: number;
   playerId: number;
 }
 
 export interface WatchlistMutationResponse {
+  userId: string;
   clientId: string;
   playerId: number;
   id?: number;

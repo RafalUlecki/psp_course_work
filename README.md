@@ -1,6 +1,6 @@
 # PropHover
 
-Chrome plėtinys + Next.js API: ant **betsson.lt** NBA taškų eilutės užvedus pelę matote **hit rate** (kiek rungtynių statistika buvo **virš** linijos) pagal filtrus ir slankiklį. Rungtynių duomenys — Postgres (demo CSV); watchlist ir kiti privatūs API — du testiniai klientai **A** / **B**, tapatybė iš prisijungimo žetono (`POST /api/auth/login`).
+Chrome plėtinys + Next.js API: ant **betsson.lt** NBA taškų eilutės užvedus pelę matote **hit rate** (kiek rungtynių statistika buvo **virš** linijos) pagal filtrus ir slankiklį. Rungtynių duomenys — Postgres (demo CSV). Klientas (**A** / **B**) yra tenant; watchlist yra **asmeninis kiekvienam vartotojui**. Vienas žmogus = klientas su vienu admin vartotoju. Tapatybė iš prisijungimo žetono (`POST /api/auth/login`).
 
 **Stack (dev):** Node 20 · Next 16 · React 19 · Postgres 16 · Prisma 6 · Chrome MV3 · Vite 6
 
@@ -59,7 +59,7 @@ npm run db:migrate
 npm run seed:demo
 ```
 
-Įkelia rungtynių CSV, klientus **A** / **B** (tušti watchlist’ai) ir keturis dev vartotojus (admin + member kiekvienam klientui); atnaujina `apps/extension/data/players.json`. Slaptažodžiai saugomi tik kaip `scrypt` hash. Dev prisijungimai:
+Įkelia rungtynių CSV, klientus **A** / **B**, keturis dev vartotojus (admin + member kiekvienam klientui) ir asmeninius watchlist’us (Jokic ant **admin-a** ir **admin-b**, jei tas žaidėjas seed’intas). Atnaujina `apps/extension/data/players.json`. Slaptažodžiai saugomi tik kaip `scrypt` hash. Dev prisijungimai:
 
 | Email | Slaptažodis | Klientas | Rolė |
 |-------|-------------|----------|------|
@@ -112,7 +112,7 @@ Produkcinis web (be hot reload): `cd apps/web && npm run build && npm run start`
 1. `npm start` (arba web dev + extension build).  
 2. **betsson.lt** — NBA eventas, rinka **Žaidėjo pelnyti taškai**.  
 3. Užvesk pelę ant seed’into žaidėjo (pvz. Luka / Jokic) — kortelė su % ir slankikliu.  
-4. Izoliacija: prisijunk kaip A-admin ir paprašyk B įrašo `id` — serveris grąžina 403, B duomenys nesikeičia. Watchlist GET/POST/DELETE gali ir **admin**, ir **member**, bet tik savo kliento eilutes. Kliento vartotojų sąrašas (`GET /api/client/users`) — tik **admin** (member → 403).
+4. Izoliacija: watchlist yra **per user**. A-admin ir A-member (tas pats klientas) nemato vienas kito eilučių; A-admin, paprašęs B įrašo `id`, gauna 403 ir B duomenys nesikeičia. GET/POST/DELETE — ir admin, ir member, bet tik **savo** eilutes. Kliento vartotojų sąrašas (`GET /api/client/users`) — tik **admin** (member → 403).
 
 ```bash
 # 1. Login as client A admin
@@ -121,27 +121,35 @@ TOKEN_A=$(curl -s http://localhost:3000/api/auth/login \
   -d '{"email":"admin-a@prophover.local","password":"password-admin-a"}' \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
 
-# 2. Login as client B admin and create a B watchlist row (Jokic is in the demo seed)
+# 2. Login as A-member (same client) and as B-admin
+TOKEN_A_MEMBER=$(curl -s http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"member-a@prophover.local","password":"password-member-a"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+
 TOKEN_B=$(curl -s http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin-b@prophover.local","password":"password-admin-b"}' \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
 
-curl -s -X POST http://localhost:3000/api/watchlist \
-  -H "Authorization: Bearer $TOKEN_B" \
-  -H 'Content-Type: application/json' \
-  -d '{"playerId":203999}'
+A_ITEM_ID=$(curl -s http://localhost:3000/api/watchlist \
+  -H "Authorization: Bearer $TOKEN_A" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
 
 B_ITEM_ID=$(curl -s http://localhost:3000/api/watchlist \
   -H "Authorization: Bearer $TOKEN_B" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
 
-# 3. Request B's record id as A-admin — expect 403
+# 3. Same-client: A-member reads A-admin's item id — expect 403
+curl -s -w '\nHTTP %{http_code}\n' \
+  "http://localhost:3000/api/watchlist?id=$A_ITEM_ID" \
+  -H "Authorization: Bearer $TOKEN_A_MEMBER"
+
+# 4. Cross-client: A-admin reads B's item id — expect 403; B's list unchanged
 curl -s -w '\nHTTP %{http_code}\n' \
   "http://localhost:3000/api/watchlist?id=$B_ITEM_ID" \
   -H "Authorization: Bearer $TOKEN_A"
 
-# 4. Try to delete B's row as A-admin — expect 403; B's list is unchanged
 curl -s -w '\nHTTP %{http_code}\n' -X DELETE \
   "http://localhost:3000/api/watchlist?id=$B_ITEM_ID" \
   -H "Authorization: Bearer $TOKEN_A"
@@ -153,11 +161,6 @@ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
   -H "Authorization: Bearer $TOKEN_A"
 
 # 6. Same list as A-member — expect 403
-TOKEN_A_MEMBER=$(curl -s http://localhost:3000/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"member-a@prophover.local","password":"password-member-a"}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
-
 curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
   -H "Authorization: Bearer $TOKEN_A_MEMBER"
 
@@ -167,7 +170,7 @@ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \
   -d '{"email":"admin-a@prophover.local","password":"wrong"}'
 ```
 
-Jei `AUTH_REQUIRED=false`, watchlist vis dar priima `X-Client-Id` (iki extension sign-in, PH-44).
+Watchlist visada reikalauja vartotojo sesijos (be žetono — 401). `X-Client-Id` ignoruojamas, kai žetonas yra.
 
 Daugiau apie DB/CSV: [apps/web/README.md](apps/web/README.md), [apps/web/data/README.md](apps/web/data/README.md).
 

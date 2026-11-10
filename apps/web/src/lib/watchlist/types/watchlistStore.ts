@@ -5,23 +5,29 @@ export interface WatchlistClientRecord {
 
 export interface WatchlistItemRecord {
   id: number;
+  userId: string;
   clientId: string;
   playerId: number;
+}
+
+export interface WatchlistOwner {
+  userId: string;
+  clientId: string;
 }
 
 export interface WatchlistStore {
   findClientById: (clientId: string) => Promise<WatchlistClientRecord | null>;
   playerExists: (playerId: number) => Promise<boolean>;
-  listByClientId: (clientId: string) => Promise<WatchlistItemRecord[]>;
+  listByOwner: (owner: WatchlistOwner) => Promise<WatchlistItemRecord[]>;
   findItem: (
-    clientId: string,
+    owner: WatchlistOwner,
     playerId: number,
   ) => Promise<WatchlistItemRecord | null>;
   findItemById: (id: number) => Promise<WatchlistItemRecord | null>;
   createItem: (
-    clientId: string,
+    owner: WatchlistOwner,
     playerId: number,
   ) => Promise<WatchlistItemRecord>;
-  deleteItem: (clientId: string, playerId: number) => Promise<boolean>;
-  deleteItemById: (id: number, clientId: string) => Promise<boolean>;
+  deleteItem: (owner: WatchlistOwner, playerId: number) => Promise<boolean>;
+  deleteItemById: (id: number, owner: WatchlistOwner) => Promise<boolean>;
 }
