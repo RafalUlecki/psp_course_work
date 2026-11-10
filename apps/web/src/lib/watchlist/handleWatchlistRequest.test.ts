@@ -81,6 +81,21 @@ const createMemoryStore = (props: {
     playerExists: async (playerId) => playerIds.has(playerId),
     listByOwner: async (owner) =>
       state.items.filter((item) => belongsToOwner(item, owner)),
+    listByClientId: async (clientId) =>
+      state.items.filter((item) => item.clientId === clientId),
+    countPlayersByClientId: async (clientId) => {
+      const counts = new Map<number, number>();
+      for (const item of state.items) {
+        if (item.clientId !== clientId) {
+          continue;
+        }
+        counts.set(item.playerId, (counts.get(item.playerId) ?? 0) + 1);
+      }
+      return [...counts.entries()].map(([playerId, count]) => ({
+        playerId,
+        count,
+      }));
+    },
     findItem: async (owner, playerId) =>
       state.items.find(
         (item) => belongsToOwner(item, owner) && item.playerId === playerId,

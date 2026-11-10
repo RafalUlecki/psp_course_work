@@ -112,7 +112,7 @@ Produkcinis web (be hot reload): `cd apps/web && npm run build && npm run start`
 1. `npm start` (arba web dev + extension build).  
 2. **betsson.lt** — NBA eventas, rinka **Žaidėjo pelnyti taškai**.  
 3. Užvesk pelę ant seed’into žaidėjo (pvz. Luka / Jokic) — kortelė su % ir slankikliu.  
-4. Izoliacija: watchlist yra **per user**. A-admin ir A-member (tas pats klientas) nemato vienas kito eilučių; A-admin, paprašęs B įrašo `id`, gauna 403 ir B duomenys nesikeičia. GET/POST/DELETE — ir admin, ir member, bet tik **savo** eilutes. Kliento vartotojų sąrašas (`GET /api/client/users`) — tik **admin** (member → 403).
+4. Izoliacija: watchlist yra **per user**. A-admin ir A-member (tas pats klientas) nemato vienas kito eilučių; A-admin, paprašęs B įrašo `id`, gauna 403 ir B duomenys nesikeičia. GET/POST/DELETE — ir admin, ir member, bet tik **savo** eilutes. Visų kliento watchlist'ų sąrašas (`GET /api/client/watchlists`) ir trending (`GET /api/client/watchlists/trending`) — tik **admin** (member → 403).
 
 ```bash
 # 1. Login as client A admin
@@ -156,13 +156,25 @@ curl -s -w '\nHTTP %{http_code}\n' -X DELETE \
 
 curl -s http://localhost:3000/api/watchlist -H "Authorization: Bearer $TOKEN_B"
 
-# 5. List users of client A as A-admin — 200, only A's users (no passwordHash)
-curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
+# 5. List every user's watchlist in client A as A-admin — 200, only A's users (no passwordHash)
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/watchlists \
   -H "Authorization: Bearer $TOKEN_A"
 
 # 6. Same list as A-member — expect 403
-curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/users \
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/watchlists \
   -H "Authorization: Bearer $TOKEN_A_MEMBER"
+
+# 7. Trending watchlisted players in client A as A-admin (count desc, playerId asc)
+curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/api/client/watchlists/trending?limit=10' \
+  -H "Authorization: Bearer $TOKEN_A"
+
+# 8. Trending as A-member — expect 403
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/watchlists/trending \
+  -H "Authorization: Bearer $TOKEN_A_MEMBER"
+
+# 9. Invalid trending limit — expect 400
+curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/api/client/watchlists/trending?limit=51' \
+  -H "Authorization: Bearer $TOKEN_A"
 
 # Wrong password — expect 401 {"error":"invalid_credentials"} (same body for unknown email)
 curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \

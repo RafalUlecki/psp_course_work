@@ -15,10 +15,19 @@ export interface WatchlistOwner {
   clientId: string;
 }
 
+export interface WatchlistPlayerCount {
+  playerId: number;
+  count: number;
+}
+
 export interface WatchlistStore {
   findClientById: (clientId: string) => Promise<WatchlistClientRecord | null>;
   playerExists: (playerId: number) => Promise<boolean>;
   listByOwner: (owner: WatchlistOwner) => Promise<WatchlistItemRecord[]>;
+  listByClientId: (clientId: string) => Promise<WatchlistItemRecord[]>;
+  countPlayersByClientId: (
+    clientId: string,
+  ) => Promise<WatchlistPlayerCount[]>;
   findItem: (
     owner: WatchlistOwner,
     playerId: number,

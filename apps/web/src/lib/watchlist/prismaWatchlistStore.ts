@@ -27,6 +27,24 @@ export const prismaWatchlistStore: WatchlistStore = {
       select: itemSelect,
       orderBy: { id: "asc" },
     }),
+  listByClientId: (clientId) =>
+    prisma.watchlistItem.findMany({
+      where: { clientId },
+      select: itemSelect,
+      orderBy: { id: "asc" },
+    }),
+  countPlayersByClientId: async (clientId) => {
+    const rows = await prisma.watchlistItem.groupBy({
+      by: ["playerId"],
+      where: { clientId },
+      _count: { playerId: true },
+    });
+
+    return rows.map((row) => ({
+      playerId: row.playerId,
+      count: row._count.playerId,
+    }));
+  },
   findItem: (owner, playerId) =>
     prisma.watchlistItem.findFirst({
       where: {

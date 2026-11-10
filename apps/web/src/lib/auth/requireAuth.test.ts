@@ -4,7 +4,8 @@ import { describe, it } from "node:test";
 
 import { OPTIONS as loginOptions } from "../../../app/api/auth/login/route";
 import { OPTIONS as revokeOptions } from "../../../app/api/auth/revoke/route";
-import { OPTIONS as clientUsersOptions } from "../../../app/api/client/users/route";
+import { OPTIONS as clientWatchlistsOptions } from "../../../app/api/client/watchlists/route";
+import { OPTIONS as trendingWatchlistsOptions } from "../../../app/api/client/watchlists/trending/route";
 import { OPTIONS as hitRateOptions } from "../../../app/api/hit-rate/route";
 import { OPTIONS as watchlistOptions } from "../../../app/api/watchlist/route";
 import { TEST_CLIENT_A_ID } from "../clients/constants";
@@ -281,8 +282,14 @@ describe("API OPTIONS handlers", () => {
     assert.equal(response.status, 204);
   });
 
-  it("should return 204 from client-users OPTIONS without a token", async () => {
-    const response = await clientUsersOptions();
+  it("should return 204 from client-watchlists OPTIONS without a token", async () => {
+    const response = await clientWatchlistsOptions();
+
+    assert.equal(response.status, 204);
+  });
+
+  it("should return 204 from trending-watchlists OPTIONS without a token", async () => {
+    const response = await trendingWatchlistsOptions();
 
     assert.equal(response.status, 204);
   });
