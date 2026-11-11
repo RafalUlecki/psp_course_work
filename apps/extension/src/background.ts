@@ -1,5 +1,4 @@
 import {
-  CLIENT_ID_HEADER,
   FETCH_HIT_RATE_MESSAGE,
   HIT_RATE_API_PATH,
   WATCHLIST_API_PATH,
@@ -59,15 +58,12 @@ const fetchHitRateFromApi = async (
 const fetchWatchlistFromApi = async (
   message: WatchlistRequestMessage,
 ): Promise<WatchlistRequestResponse> => {
-  const { method, clientId } = message;
-  const headers: Record<string, string> = {
-    [CLIENT_ID_HEADER]: clientId,
-  };
-  const init: RequestInit = { method, headers };
+  const { method } = message;
+  const init: RequestInit = { method };
   let url = `${HIT_RATE_API_BASE}${WATCHLIST_API_PATH}`;
 
   if (method === "POST") {
-    headers["Content-Type"] = "application/json";
+    init.headers = { "Content-Type": "application/json" };
     init.body = JSON.stringify({ playerId: message.playerId });
   }
 
