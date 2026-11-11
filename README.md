@@ -180,9 +180,17 @@ curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/api/client/watchlists/
 curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin-a@prophover.local","password":"wrong"}'
+
+# Token A + X-Client-Id: B — still A's watchlist (header ignored)
+curl -s http://localhost:3000/api/watchlist \
+  -H "Authorization: Bearer $TOKEN_A" \
+  -H "X-Client-Id: B"
+
+# No token — 401
+curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/watchlist
 ```
 
-Watchlist visada reikalauja vartotojo sesijos (be žetono — 401). `X-Client-Id` ignoruojamas, kai žetonas yra.
+Watchlist visada reikalauja vartotojo sesijos (be žetono — 401). Tapatybė tik iš žetono: `X-Client-Id` ignoruojamas (pvz. token A + `X-Client-Id: B` vis tiek grąžina A watchlist'ą).
 
 Daugiau apie DB/CSV: [apps/web/README.md](apps/web/README.md), [apps/web/data/README.md](apps/web/data/README.md).
 

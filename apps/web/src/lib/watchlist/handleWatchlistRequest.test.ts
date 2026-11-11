@@ -219,11 +219,50 @@ describe("handleWatchlistRequest", () => {
     assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
   });
 
+  it("should return only client B admin player ids when listing with B's token and X-Client-Id A", async () => {
+    const result = await listRequest(USER_B_ADMIN, seededStore(), {
+      [CLIENT_ID_HEADER]: TEST_CLIENT_A_ID,
+    });
+
+    assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
+  });
+
+  it("should return A's player ids when X-Client-Id is blank", async () => {
+    const result = await listRequest(USER_A_ADMIN, seededStore(), {
+      [CLIENT_ID_HEADER]: "   ",
+    });
+
+    assert.deepEqual(listPlayerIds(result), [CLIENT_A_PLAYER_ID]);
+  });
+
   it("should create a watchlist row for the session user when posting a player id", async () => {
     const result = await handleWatchlistRequest(
       {
         method: "POST",
         headers: new Headers(),
+        searchParams: new URLSearchParams(),
+        bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: USER_A_ADMIN,
+      },
+      seededStore(),
+    );
+
+    assert.deepEqual(result, {
+      status: 201,
+      body: {
+        userId: USER_A_ADMIN.userId,
+        clientId: TEST_CLIENT_A_ID,
+        playerId: SHARED_PLAYER_ID,
+        id: 4,
+      },
+    });
+  });
+
+  it("should create a watchlist row for the session user when posting with X-Client-Id for another client", async () => {
+    const result = await handleWatchlistRequest(
+      {
+        method: "POST",
+        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID }),
         searchParams: new URLSearchParams(),
         bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
         auth: USER_A_ADMIN,
@@ -264,6 +303,23 @@ describe("handleWatchlistRequest", () => {
       },
       store,
     );
+
+    assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
+  });
+
+  it("should omit the posted player from client B when A posts with X-Client-Id B", async () => {
+    const store = seededStore();
+    await handleWatchlistRequest(
+      {
+        method: "POST",
+        headers: new Headers({ [CLIENT_ID_HEADER]: TEST_CLIENT_B_ID }),
+        searchParams: new URLSearchParams(),
+        bodyText: JSON.stringify({ playerId: SHARED_PLAYER_ID }),
+        auth: USER_A_ADMIN,
+      },
+      store,
+    );
+    const result = await listRequest(USER_B_ADMIN, store);
 
     assert.deepEqual(listPlayerIds(result), [CLIENT_B_PLAYER_ID]);
   });

@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type { RequireAuthAuthenticated } from "../auth/types/requireAuth";
 import type { UserRole } from "../auth/types/userRole";
 import {
+  CLIENT_ID_HEADER,
   TEST_CLIENT_A_ID,
   TEST_CLIENT_A_NAME,
   TEST_CLIENT_B_ID,
@@ -47,6 +48,16 @@ const authFor = (
   clientId,
   role,
   tokenHash: `hash-${clientId}-${role}`,
+});
+
+const TOKEN_A = authFor(TEST_CLIENT_A_ID);
+const TOKEN_B = authFor(TEST_CLIENT_B_ID);
+
+const oppositeClientHeader = (
+  auth: RequireAuthAuthenticated,
+): Record<string, string> => ({
+  [CLIENT_ID_HEADER]:
+    auth.clientId === TEST_CLIENT_A_ID ? TEST_CLIENT_B_ID : TEST_CLIENT_A_ID,
 });
 
 const createMemoryStore = (props: {
@@ -155,7 +166,7 @@ const callWatchlist = (
   return handleWatchlistRequest(
     {
       method,
-      headers: new Headers(),
+      headers: new Headers(oppositeClientHeader(auth)),
       searchParams,
       bodyText,
       auth,
@@ -168,7 +179,7 @@ const starPlayersAsA = async (store: WatchlistStore): Promise<void> => {
   for (const playerId of CLIENT_A_PLAYER_IDS) {
     await callWatchlist({
       method: "POST",
-      auth: authFor(TEST_CLIENT_A_ID),
+      auth: TOKEN_A,
       playerId,
       store,
     });
@@ -188,7 +199,7 @@ const deleteAPlayersAsB = (
     CLIENT_A_PLAYER_IDS.map((playerId) =>
       callWatchlist({
         method: "DELETE",
-        auth: authFor(TEST_CLIENT_B_ID),
+        auth: TOKEN_B,
         playerId,
         store,
       }),
@@ -213,11 +224,11 @@ const aPlayerIdsIn = (playerIds: number[] | null): number[] =>
   );
 
 describe("watchlist client isolation", () => {
-  it("should return exactly A's items when listing as A after starring players", async () => {
+  it("should return exactly A's items when listing as A with X-Client-Id B after starring players", async () => {
     const store = await storeWithClientAStarred();
     const result = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_A_ID),
+      auth: TOKEN_A,
       store,
     });
 
@@ -228,11 +239,11 @@ describe("watchlist client isolation", () => {
     });
   });
 
-  it("should return an empty watchlist when listing as B after A stars players", async () => {
+  it("should return an empty watchlist when listing as B with X-Client-Id A after A stars players", async () => {
     const store = await storeWithClientAStarred();
     const result = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_B_ID),
+      auth: TOKEN_B,
       store,
     });
     const snapshot = listSnapshot(result);
@@ -258,7 +269,7 @@ describe("watchlist client isolation", () => {
     await deleteAPlayersAsB(store);
     const result = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_A_ID),
+      auth: TOKEN_A,
       store,
     });
 
@@ -274,7 +285,7 @@ describe("watchlist client isolation", () => {
     const deleteResults = await deleteAPlayersAsB(store);
     const listResult = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_B_ID),
+      auth: TOKEN_B,
       store,
     });
     const list = listSnapshot(listResult);
@@ -305,13 +316,13 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     await callWatchlist({
       method: "POST",
-      auth: authFor(TEST_CLIENT_B_ID),
+      auth: TOKEN_B,
       playerId: CLIENT_A_FIRST_PLAYER_ID,
       store,
     });
     const result = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_A_ID),
+      auth: TOKEN_A,
       store,
     });
 
@@ -326,13 +337,13 @@ describe("watchlist client isolation", () => {
     const store = await storeWithClientAStarred();
     await callWatchlist({
       method: "POST",
-      auth: authFor(TEST_CLIENT_B_ID),
+      auth: TOKEN_B,
       playerId: CLIENT_A_FIRST_PLAYER_ID,
       store,
     });
     const result = await callWatchlist({
       method: "GET",
-      auth: authFor(TEST_CLIENT_B_ID),
+      auth: TOKEN_B,
       store,
     });
     assert.deepEqual(listSnapshot(result), {
