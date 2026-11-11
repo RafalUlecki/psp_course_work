@@ -28,6 +28,7 @@ export const GET = async (request: Request): Promise<Response> => {
 
   const result = await handleHitRateRequest({
     searchParams: url.searchParams,
+    auth,
   });
 
   return Response.json(result.body, {
