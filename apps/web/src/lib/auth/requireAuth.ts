@@ -1,12 +1,15 @@
 import { isAuthRequired } from "./parseAuthRequired";
 import { prismaAuthTokenStore } from "./prismaAuthTokenStore";
+import { prismaUserStore } from "./prismaUserStore";
 import { isPublicApiRoute } from "./publicApiRoutes";
+import { resolveAuthSession } from "./resolveAuthSession";
 import type { AuthTokenStore } from "./types/authTokenStore";
 import type {
   RequireAuthProps,
   RequireAuthResult,
   RequireAuthSuccess,
 } from "./types/requireAuth";
+import type { UserStore } from "./types/userStore";
 import { unauthorizedResult } from "./unauthorizedResult";
 import { verifyToken } from "./verifyToken";
 
@@ -24,6 +27,7 @@ export const isRequireAuthOk = (
 export const requireAuth = async (
   props: RequireAuthProps,
   store: AuthTokenStore = prismaAuthTokenStore,
+  userStore: UserStore = prismaUserStore,
 ): Promise<RequireAuthResult> => {
   const {
     authorizationHeader,
@@ -54,10 +58,20 @@ export const requireAuth = async (
     return unauthorizedResult();
   }
 
+  const session = await resolveAuthSession(
+    { userId: verified.userId },
+    userStore,
+  );
+  if (session === null) {
+    return unauthorizedResult();
+  }
+
   return {
     ok: true,
     skipped: false,
-    clientId: verified.clientId,
+    userId: session.userId,
+    clientId: session.clientId,
+    role: session.role,
     tokenHash: verified.tokenHash,
   };
 };

@@ -12,13 +12,19 @@ import { verifyToken } from "./verifyToken";
 const CREATED_AT = new Date("2026-01-01T00:00:00.000Z");
 const DAY_13 = new Date(CREATED_AT.getTime() + 13 * MS_PER_DAY);
 const AFTER_DAY_14 = new Date(CREATED_AT.getTime() + 14 * MS_PER_DAY + 1);
+const TEST_USER_A_ID = "user-a";
 
 const bearer = (rawToken: string): string => `Bearer ${rawToken}`;
 
 const createClientToken = async () => {
   const store = createMemoryAuthTokenStore();
   const rawToken = await createToken(
-    { clientId: TEST_CLIENT_A_ID, now: CREATED_AT, ttlDays: 14 },
+    {
+      userId: TEST_USER_A_ID,
+      clientId: TEST_CLIENT_A_ID,
+      now: CREATED_AT,
+      ttlDays: 14,
+    },
     store,
   );
   return { store, rawToken };
@@ -32,7 +38,12 @@ describe("verifyToken", () => {
       store,
     );
 
-    assert.equal(result.ok ? result.clientId : null, TEST_CLIENT_A_ID);
+    assert.deepEqual(
+      result.ok
+        ? { userId: result.userId, clientId: result.clientId }
+        : null,
+      { userId: TEST_USER_A_ID, clientId: TEST_CLIENT_A_ID },
+    );
   });
 
   it("should fail when the Authorization header is missing", async () => {

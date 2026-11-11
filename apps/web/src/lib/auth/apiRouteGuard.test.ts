@@ -34,8 +34,8 @@ const toApiPath = (file: string): string => {
 };
 
 describe("API route auth guard", () => {
-  it("should start with an empty public allowlist", () => {
-    assert.deepEqual(PUBLIC_API_ROUTES, []);
+  it("should allow only the login route on the public allowlist", () => {
+    assert.deepEqual(PUBLIC_API_ROUTES, ["/api/auth/login"]);
   });
 
   it("should require requireAuth or a PUBLIC_API_ROUTES entry for every API route", () => {

@@ -10,13 +10,19 @@ export const createToken = async (
   props: CreateTokenProps,
   store: AuthTokenStore,
 ): Promise<string> => {
-  const { clientId, now = new Date(), ttlDays = getAuthTokenTtlDays() } = props;
+  const {
+    userId,
+    clientId,
+    now = new Date(),
+    ttlDays = getAuthTokenTtlDays(),
+  } = props;
   const rawToken = generateRawToken();
   const createdAt = now;
   const expiresAt = new Date(createdAt.getTime() + ttlDays * MS_PER_DAY);
 
   await store.insert({
     id: randomUUID(),
+    userId,
     clientId,
     tokenHash: hashToken(rawToken),
     createdAt,

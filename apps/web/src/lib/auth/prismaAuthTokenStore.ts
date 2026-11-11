@@ -6,6 +6,7 @@ export const prismaAuthTokenStore: AuthTokenStore = {
     prisma.authToken.create({
       data: {
         id: record.id,
+        userId: record.userId,
         clientId: record.clientId,
         tokenHash: record.tokenHash,
         createdAt: record.createdAt,

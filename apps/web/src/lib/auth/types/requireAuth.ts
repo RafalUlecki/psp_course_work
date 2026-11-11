@@ -1,3 +1,4 @@
+import type { UserRole } from "./userRole";
 import type { UnauthorizedHttpResult } from "./unauthorizedResult";
 
 export interface RequireAuthProps {
@@ -12,7 +13,9 @@ export interface RequireAuthProps {
 export interface RequireAuthAuthenticated {
   ok: true;
   skipped: false;
+  userId: string;
   clientId: string;
+  role: UserRole;
   tokenHash: string;
 }
 

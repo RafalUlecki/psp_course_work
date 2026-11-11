@@ -32,5 +32,10 @@ export const verifyToken = async (
     return { ok: false };
   }
 
-  return { ok: true, clientId: record.clientId, tokenHash: record.tokenHash };
+  return {
+    ok: true,
+    userId: record.userId,
+    clientId: record.clientId,
+    tokenHash: record.tokenHash,
+  };
 };

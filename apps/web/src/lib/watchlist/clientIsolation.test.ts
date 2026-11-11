@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { RequireAuthAuthenticated } from "../auth/types/requireAuth";
+import type { UserRole } from "../auth/types/userRole";
 import {
   TEST_CLIENT_A_ID,
   TEST_CLIENT_A_NAME,
@@ -12,6 +13,7 @@ import { handleWatchlistRequest } from "./handleWatchlistRequest";
 import type { WatchlistHttpResult } from "./types/api";
 import type {
   WatchlistItemRecord,
+  WatchlistOwner,
   WatchlistStore,
 } from "./types/watchlistStore";
 
@@ -35,11 +37,16 @@ interface CallWatchlistProps {
   store: WatchlistStore;
 }
 
-const authFor = (clientId: string): RequireAuthAuthenticated => ({
+const authFor = (
+  clientId: string,
+  role: UserRole = "admin",
+): RequireAuthAuthenticated => ({
   ok: true,
   skipped: false,
+  userId: `user-${clientId}-${role}`,
   clientId,
-  tokenHash: `hash-${clientId}`,
+  role,
+  tokenHash: `hash-${clientId}-${role}`,
 });
 
 const createMemoryStore = (props: {
@@ -57,26 +64,63 @@ const createMemoryStore = (props: {
     { id: TEST_CLIENT_A_ID, name: TEST_CLIENT_A_NAME },
     { id: TEST_CLIENT_B_ID, name: TEST_CLIENT_B_NAME },
   ];
+  const belongsToOwner = (
+    item: WatchlistItemRecord,
+    owner: WatchlistOwner,
+  ): boolean =>
+    item.userId === owner.userId && item.clientId === owner.clientId;
 
   return {
     findClientById: async (clientId) =>
       clients.find((client) => client.id === clientId) ?? null,
     playerExists: async (playerId) => playerIds.has(playerId),
+    listByOwner: async (owner) =>
+      state.items.filter((item) => belongsToOwner(item, owner)),
     listByClientId: async (clientId) =>
       state.items.filter((item) => item.clientId === clientId),
-    findItem: async (clientId, playerId) =>
+    countPlayersByClientId: async (clientId) => {
+      const counts = new Map<number, number>();
+      for (const item of state.items) {
+        if (item.clientId !== clientId) {
+          continue;
+        }
+        counts.set(item.playerId, (counts.get(item.playerId) ?? 0) + 1);
+      }
+      return [...counts.entries()].map(([playerId, count]) => ({
+        playerId,
+        count,
+      }));
+    },
+    findItem: async (owner, playerId) =>
       state.items.find(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
       ) ?? null,
-    createItem: async (clientId, playerId) => {
-      const item = { id: nextId, clientId, playerId };
+    findItemById: async (id) =>
+      state.items.find((item) => item.id === id) ?? null,
+    createItem: async (owner, playerId) => {
+      const item = {
+        id: nextId,
+        userId: owner.userId,
+        clientId: owner.clientId,
+        playerId,
+      };
       nextId += 1;
       state.items.push(item);
       return item;
     },
-    deleteItem: async (clientId, playerId) => {
+    deleteItem: async (owner, playerId) => {
       const index = state.items.findIndex(
-        (item) => item.clientId === clientId && item.playerId === playerId,
+        (item) => belongsToOwner(item, owner) && item.playerId === playerId,
+      );
+      if (index === -1) {
+        return false;
+      }
+      state.items.splice(index, 1);
+      return true;
+    },
+    deleteItemById: async (id, owner) => {
+      const index = state.items.findIndex(
+        (item) => item.id === id && belongsToOwner(item, owner),
       );
       if (index === -1) {
         return false;
