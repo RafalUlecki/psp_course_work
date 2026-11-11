@@ -33,8 +33,17 @@ model Client {
   watchlistItems WatchlistItem[]
   users          User[]
   authTokens     AuthToken[]
+  settings       ClientSettings?
 
   @@map("clients")
+}
+
+model ClientSettings {
+  clientId     String @id @map("client_id")
+  defaultLastN Int    @map("default_last_n")
+  client       Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_settings")
 }
 
 model User {

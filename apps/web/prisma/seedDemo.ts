@@ -334,6 +334,9 @@ const printSummary = (props: {
   console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
   console.log(`Clients upserted: ${TEST_CLIENT_A_ID}, ${TEST_CLIENT_B_ID}`);
   console.log(
+    `Client settings upserted: defaultLastN=10 for ${TEST_CLIENT_A_ID} and ${TEST_CLIENT_B_ID}`,
+  );
+  console.log(
     `Dev users upserted: ${DEV_USERS.map((user) => `${user.email} (${user.clientId} ${user.role})`).join(", ")}`,
   );
   console.log("Dev passwords: see README (hash only is stored in the database).");
