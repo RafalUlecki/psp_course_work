@@ -29,7 +29,9 @@ npm run build
 
 The app uses [Prisma](https://www.prisma.io/) against PostgreSQL. Connection string: `DATABASE_URL` in `.env` (see `.env.example`; placeholders only, no real keys).
 
-1. Run a local Postgres instance (Docker example; same image as CI). There is no Docker Compose file in this repo:
+To run **web + Postgres together** from the repo root (migrate, idempotent demo seed, then the server): `cp .env.example .env` then `docker compose up --build`. Env vars are documented in the [root README](../../README.md). The Chrome extension is still `npm run build` + Load unpacked.
+
+1. Run a local Postgres instance if you are **not** using Compose (Docker example; same image as CI):
 
 ```bash
 docker run --name prophover-postgres \
@@ -39,7 +41,7 @@ docker run --name prophover-postgres \
   -p 5432:5432 -d postgres:16
 ```
 
-2. Copy `.env.example` to `.env` and set `DATABASE_URL`, for example:
+2. Copy `apps/web/.env.example` to `apps/web/.env` and set `DATABASE_URL` (host `localhost` when Postgres is published on the host; Compose uses the root `.env` with host `postgres`):
 
 ```bash
 DATABASE_URL="postgresql://prophover:prophover@localhost:5432/prophover"
