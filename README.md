@@ -59,7 +59,7 @@ npm run db:migrate
 npm run seed:demo
 ```
 
-Įkelia rungtynių CSV, klientus **A** / **B**, keturis dev vartotojus (admin + member kiekvienam klientui) ir asmeninius watchlist’us (Jokic ant **admin-a** ir **admin-b**, jei tas žaidėjas seed’intas). Atnaujina `apps/extension/data/players.json`. Slaptažodžiai saugomi tik kaip `scrypt` hash. Dev prisijungimai:
+Įkelia rungtynių CSV, klientus **A** / **B**, abiejų klientų nustatymus (`defaultLastN=10`), keturis dev vartotojus (admin + member kiekvienam klientui) ir asmeninius watchlist’us (Jokic ant **admin-a** ir **admin-b**, jei tas žaidėjas seed’intas). Atnaujina `apps/extension/data/players.json`. Slaptažodžiai saugomi tik kaip `scrypt` hash. Dev prisijungimai:
 
 | Email | Slaptažodis | Klientas | Rolė |
 |-------|-------------|----------|------|
@@ -175,6 +175,27 @@ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/client/watchlists/t
 # 9. Invalid trending limit — expect 400
 curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/api/client/watchlists/trending?limit=51' \
   -H "Authorization: Bearer $TOKEN_A"
+
+# 10. Client settings: A-admin changes defaultLastN to 5
+curl -s -w '\nHTTP %{http_code}\n' -X PATCH http://localhost:3000/api/client-settings \
+  -H "Authorization: Bearer $TOKEN_A" \
+  -H 'Content-Type: application/json' \
+  -d '{"defaultLastN":5}'
+
+# 11. Same PATCH as A-member — expect 403
+curl -s -w '\nHTTP %{http_code}\n' -X PATCH http://localhost:3000/api/client-settings \
+  -H "Authorization: Bearer $TOKEN_A_MEMBER" \
+  -H 'Content-Type: application/json' \
+  -d '{"defaultLastN":5}'
+
+# 12. Same hit-rate call without lastN: A uses 5, B still uses 10
+curl -s -w '\nHTTP %{http_code}\n' \
+  'http://localhost:3000/api/hit-rate?playerId=203999&stat=PTS&line=24.5' \
+  -H "Authorization: Bearer $TOKEN_A"
+
+curl -s -w '\nHTTP %{http_code}\n' \
+  'http://localhost:3000/api/hit-rate?playerId=203999&stat=PTS&line=24.5' \
+  -H "Authorization: Bearer $TOKEN_B"
 
 # Wrong password — expect 401 {"error":"invalid_credentials"} (same body for unknown email)
 curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/api/auth/login \
