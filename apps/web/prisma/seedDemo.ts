@@ -299,8 +299,14 @@ const upsertGameLogs = async (props: {
   return { inserted, updated, removedNonKaggle };
 };
 
-const writePlayersJson = (players: DemoPlayer[]): void => {
+const writePlayersJson = (players: DemoPlayer[]): boolean => {
+  const directory = path.dirname(PLAYERS_JSON_PATH);
+  if (!existsSync(directory)) {
+    return false;
+  }
+
   writeFileSync(PLAYERS_JSON_PATH, toPlayersJson(buildPlayerNameMap(players)));
+  return true;
 };
 
 const loadCsvRows = (): PlayerStatisticsRow[] => {
@@ -317,8 +323,16 @@ const printSummary = (props: {
   inserted: number;
   updated: number;
   removedNonKaggle: number;
+  wrotePlayersJson: boolean;
 }): void => {
-  const { seededAll, players, inserted, updated, removedNonKaggle } = props;
+  const {
+    seededAll,
+    players,
+    inserted,
+    updated,
+    removedNonKaggle,
+    wrotePlayersJson,
+  } = props;
   console.log(`CSV: ${DEMO_CSV_PATH}`);
   if (seededAll) {
     console.log(`Players: all (${players.length})`);
@@ -331,7 +345,13 @@ const printSummary = (props: {
   console.log(`Non-kaggle game logs removed: ${removedNonKaggle}`);
   console.log(`Game logs inserted: ${inserted}`);
   console.log(`Game logs updated: ${updated}`);
-  console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
+  if (wrotePlayersJson) {
+    console.log(`Wrote ${PLAYERS_JSON_PATH} (${players.length} names)`);
+  } else {
+    console.log(
+      `Skipped players.json (directory not found: ${path.dirname(PLAYERS_JSON_PATH)})`,
+    );
+  }
   console.log(`Clients upserted: ${TEST_CLIENT_A_ID}, ${TEST_CLIENT_B_ID}`);
   console.log(
     `Client settings upserted: defaultLastN=10 for ${TEST_CLIENT_A_ID} and ${TEST_CLIENT_B_ID}`,
@@ -375,7 +395,7 @@ const main = async (): Promise<void> => {
     rows: selectedRows,
     playerIds,
   });
-  writePlayersJson(players);
+  const wrotePlayersJson = writePlayersJson(players);
   await seedTestClients({ db: prisma });
   await seedDevUsers({ db: prisma });
   await seedDevWatchlistItems({ db: prisma, playerIds });
@@ -386,6 +406,7 @@ const main = async (): Promise<void> => {
     inserted,
     updated,
     removedNonKaggle,
+    wrotePlayersJson,
   });
 };
 
