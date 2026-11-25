@@ -31,6 +31,16 @@ Paleidžia **Postgres 16** ir produkcinį Next.js API ant [http://localhost:3000
 
 Sustabdyti: `docker compose down`. Ištrinti DB volume: `docker compose down -v`.
 
+### Našumas (atsako greitis)
+
+Stage I atributas: tipinis `GET /api/hit-rate` atsakymas **< 300 ms** (vienas žaidėjas, last 10, taškai, linija keičiama kaip slankikliu). Po Compose:
+
+```bash
+cd apps/web && npm run perf
+```
+
+Matuoja p50 / p95 / max (be warm-up), prisijungia demo vartotoju jei `AUTH_REQUIRED` įjungtas, ir palygina su 300 ms. Komanda ir rezultatai: [docs/performance/hit-rate-response-time.md](docs/performance/hit-rate-response-time.md).
+
 ### Aplinkos kintamieji (šaknies `.env`)
 
 Compose ir web konteineris skaito **šaknies** `.env` (pavyzdys committed: `.env.example`; `.env` gitignore’intas, be tikrų secret’ų). Pakeitus reikšmę (pvz. `AUTH_TOKEN_TTL_DAYS`) ir perkrovus konteinerius elgsena keičiasi be kodo keitimo.
@@ -38,7 +48,7 @@ Compose ir web konteineris skaito **šaknies** `.env` (pavyzdys committed: `.env
 | Kintamasis | Ką valdo |
 |------------|----------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres konteinerio vartotojas, slaptažodis ir duomenų bazė (turi sutapti su `DATABASE_URL`) |
-| `DATABASE_URL` | Prisma / API ryšys su Postgres. Compose tinkle hostas yra **`postgres`** (serviso vardas) |
+| `DATABASE_URL` | Prisma / API ryšys su Postgres. Numatyta Compose reikšmė naudoja **`host.docker.internal`** (žr. `.env.example`); kai konteineriai mato vienas kitą, galima keisti į **`postgres`** |
 | `AUTH_TOKEN_TTL_DAYS` | Prisijungimo žetono galiojimas dienomis. Trūksta → 14. Ne skaičius arba `< 1` → startas nutrūksta |
 | `AUTH_REQUIRED` | Ar privatūs `/api` maršrutai reikalauja Bearer žetono (numatytai `true`). `POST /api/auth/login` visada viešas |
 | `NEXT_PUBLIC_API_BASE_URL` | Viešas API URL naršyklei |
@@ -275,6 +285,9 @@ Daugiau apie DB/CSV: [apps/web/README.md](apps/web/README.md), [apps/web/data/RE
 cd apps/web
 npm test
 npm run lint
+npm run perf
 ```
+
+`npm run perf` reikalauja veikiančio API (`docker compose up --build`). Rezultatai: [docs/performance/hit-rate-response-time.md](docs/performance/hit-rate-response-time.md).
 
 AI agentams: [AGENTS.md](AGENTS.md).

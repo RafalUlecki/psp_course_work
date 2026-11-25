@@ -21,9 +21,12 @@ Open [http://localhost:3000](http://localhost:3000). The document title is **Pro
 npm test
 npm run lint
 npm run build
+npm run perf
 ```
 
 `npm test` is the unit-test command (Node test runner). It must be run from `apps/web` and also picks up `apps/extension/tests/**/*.test.ts`. It does not need a database.
+
+`npm run perf` times sequential `GET /api/hit-rate` calls against the API (Compose on `localhost:3000` after the [root README](../../README.md) setup). It prints p50 / p95 / max versus the 300 ms Stage I target. Snapshot: [docs/performance/hit-rate-response-time.md](../../docs/performance/hit-rate-response-time.md).
 
 ## Database (Prisma + Postgres)
 
